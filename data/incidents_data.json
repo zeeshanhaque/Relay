@@ -1,0 +1,57 @@
+{
+  "form": {
+    "selected_services": [
+      "BD",
+      "MR V"
+    ],
+    "service_status": "Degraded",
+    "selected_users": [
+      "GLOBAL"
+    ],
+    "incidents": [
+      {
+        "number": "INC12345678",
+        "priority": ""
+      }
+    ],
+    "description": "dddd",
+    "impact": "iiii",
+    "start_time": "2026-03-06T00:17:09",
+    "end_time": "2026-03-19T00:27:09",
+    "next_update": "2026-03-19T01:27:09"
+  },
+  "progress_entries": [
+    {
+      "datetime": "17/03/2026 00:40",
+      "text": "initial progress"
+    },
+    {
+      "datetime": "17/03/2026 00:45",
+      "text": "we are monitoring"
+    }
+  ],
+  "to_recipient": "zeeshan@gmail.com",
+  "bcc_recipients": {
+    "APAC": [
+      "chen.yun@gmail.com",
+      "akira.tanaka@apacmail.com",
+      "priya.sharma@apacmail.com",
+      "min.ji.kim@apacmail.com",
+      "ali.hassan@emeamail.com"
+    ],
+    "EMEA": [
+      "sophie.dubois@emeamail.com",
+      "ali.hassan@emeamail.com",
+      "tom.schmidt@emeamail.com",
+      "lucas.nielsen@emeamail.com",
+      "anastasia.popov@emeamail.com"
+    ],
+    "AMERICAS": [
+      "michael.smith@americasmail.com",
+      "carla.martinez@americasmail.com",
+      "kevin.johnson@americasmail.com",
+      "daniela.gomez@americasmail.com",
+      "thiago.silva@americasmail.com"
+    ]
+  }
+}

@@ -1,0 +1,155 @@
+"""
+Data Manager - Handles JSON persistence for the Incident Management System.
+All saved data lives in data/incidents_data.json
+"""
+import json
+import os
+from datetime import datetime
+from pathlib import Path
+
+
+DATA_DIR = Path(__file__).parent.parent / "data"
+DATA_FILE = DATA_DIR / "incidents_data.json"
+
+EMAIL_LISTS = {
+    "APAC": [
+        "chen.yun@gmail.com",
+        "akira.tanaka@apacmail.com",
+        "priya.sharma@apacmail.com",
+        "min.ji.kim@apacmail.com",
+        "ali.hassan@emeamail.com",
+    ],
+    "EMEA": [
+        "sophie.dubois@emeamail.com",
+        "ali.hassan@emeamail.com",
+        "tom.schmidt@emeamail.com",
+        "lucas.nielsen@emeamail.com",
+        "anastasia.popov@emeamail.com",
+    ],
+    "AMERICAS": [
+        "michael.smith@americasmail.com",
+        "carla.martinez@americasmail.com",
+        "kevin.johnson@americasmail.com",
+        "daniela.gomez@americasmail.com",
+        "thiago.silva@americasmail.com",
+    ],
+}
+
+SERVICES = ["BD", "MR V", "MR L", "RN", "RN SN", "DGT", "SAM", "CRT", "RXL"]
+USERS = ["GLOBAL", "APAC", "EMEA", "AMERICAS"]
+SERVICE_STATUSES = ["Available", "Unavailable", "Degraded", "Under Observation"]
+
+
+def _default_data() -> dict:
+    return {
+        "form": {
+            "selected_services": [],
+            "service_status": "Available",
+            "selected_users": [],
+            "incidents": [],
+            "start_time": "",
+            "end_time": "",
+            "next_update": "",
+            "description": "",
+            "impact": "",
+        },
+        "progress_entries": [],
+        "to_recipient": "zeeshan@gmail.com",
+        "bcc_recipients": {
+            "APAC": EMAIL_LISTS["APAC"],
+            "EMEA": EMAIL_LISTS["EMEA"],
+            "AMERICAS": EMAIL_LISTS["AMERICAS"],
+        },
+    }
+
+
+def load_data() -> dict:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    if DATA_FILE.exists():
+        try:
+            with open(DATA_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            # Merge with defaults to handle missing keys from older saves
+            defaults = _default_data()
+            for key in defaults:
+                if key not in data:
+                    data[key] = defaults[key]
+            return data
+        except (json.JSONDecodeError, KeyError):
+            pass
+    return _default_data()
+
+
+def save_data(data: dict) -> None:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+
+def clear_data() -> dict:
+    data = _default_data()
+    save_data(data)
+    return data
+
+
+def get_recipients(selected_users: list[str], bcc_config: dict) -> list[str]:
+    """Return deduplicated flat list of email recipients based on selected user regions."""
+    all_recipients = []
+    if "GLOBAL" in selected_users:
+        for region in ["APAC", "EMEA", "AMERICAS"]:
+            all_recipients.extend(bcc_config.get(region, []))
+    else:
+        for region in selected_users:
+            all_recipients.extend(bcc_config.get(region, []))
+    # Deduplicate preserving order
+    seen = set()
+    result = []
+    for email in all_recipients:
+        if email not in seen:
+            seen.add(email)
+            result.append(email)
+    return result
+
+
+def format_list(items: list[str]) -> str:
+    if not items:
+        return ""
+    if len(items) == 1:
+        return items[0]
+    if len(items) == 2:
+        return f"{items[0]} and {items[1]}"
+    return ", ".join(items[:-1]) + f", and {items[-1]}"
+
+
+def round_to_quarter(dt: datetime) -> datetime:
+    """Round a datetime to the nearest 15-minute interval."""
+    minutes = dt.minute
+    rounded = round(minutes / 15) * 15
+    if rounded == 60:
+        dt = dt.replace(minute=0, second=0, microsecond=0)
+        dt = dt.replace(hour=dt.hour + 1)
+    else:
+        dt = dt.replace(minute=rounded, second=0, microsecond=0)
+    return dt
+
+
+def format_datetime_display(iso_str: str) -> str:
+    """Convert ISO datetime string to DD/MM/YYYY HH:MM display format."""
+    if not iso_str:
+        return ""
+    try:
+        dt = datetime.fromisoformat(iso_str)
+        return dt.strftime("%d/%m/%Y %H:%M")
+    except ValueError:
+        return iso_str
+
+
+def validate_incident(num: str) -> tuple[bool, bool]:
+    """
+    Returns (is_valid, starts_with_zero).
+    Format must be INC followed by exactly 8 digits.
+    """
+    import re
+    if re.match(r"^INC[0-9]{8}$", num):
+        return True, num.startswith("INC0")
+    return False, False
