@@ -48,12 +48,26 @@ QLineEdit, QTextEdit, QDateTimeEdit, QComboBox {
     border-radius: 8px;
     padding: 8px 12px;
     background: white;
+    background-color: white;
+    color: #2c3e50;
     selection-background-color: #00915A;
 }
 
 QLineEdit:focus, QTextEdit:focus, QDateTimeEdit:focus, QComboBox:focus {
     border: 2px solid #00915A;
     background: #f0faf6;
+    background-color: #f0faf6;
+}
+
+QDateTimeEdit::drop-down {
+    border: none;
+    width: 24px;
+}
+
+QDateTimeEdit::down-arrow {
+    image: url(:/icons/chevron_down.png);
+    width: 12px;
+    height: 12px;
 }
 
 QLineEdit#invalidField {
@@ -76,6 +90,76 @@ QComboBox QAbstractItemView {
     border-radius: 6px;
     selection-background-color: #e8f5f0;
     selection-color: #00915A;
+}
+
+/* ── Calendar Popup ── */
+QCalendarWidget {
+    background-color: white;
+    color: #2c3e50;
+}
+
+QCalendarWidget QToolButton {
+    background-color: white;
+    color: #2c3e50;
+    border: none;
+    padding: 6px;
+}
+
+QCalendarWidget QToolButton:hover {
+    background-color: #e8f5f0;
+    color: #00915A;
+    border-radius: 4px;
+}
+
+QCalendarWidget QMenu {
+    background-color: white;
+    color: #2c3e50;
+}
+
+QCalendarWidget QSpinBox {
+    background-color: white;
+    color: #2c3e50;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+}
+
+QCalendarWidget QAbstractItemView {
+    background-color: white;
+    color: #2c3e50;
+    selection-background-color: #00915A;
+    selection-color: white;
+    outline: none;
+}
+
+QCalendarWidget QAbstractItemView:disabled {
+    color: #bbb;
+}
+
+QCalendarWidget #qt_calendar_navigationbar {
+    background-color: #00915A;
+    padding: 4px;
+}
+
+QCalendarWidget #qt_calendar_prevmonth,
+QCalendarWidget #qt_calendar_nextmonth {
+    color: white;
+    border: none;
+    padding: 6px;
+}
+
+QCalendarWidget #qt_calendar_prevmonth:hover,
+QCalendarWidget #qt_calendar_nextmonth:hover {
+    background-color: #007047;
+    border-radius: 4px;
+}
+
+QCalendarWidget #qt_calendar_monthbutton,
+QCalendarWidget #qt_calendar_yearbutton {
+    color: white;
+    background: transparent;
+    border: none;
+    padding: 4px 8px;
+    font-weight: 700;
 }
 
 /* ── Buttons ── */
@@ -125,10 +209,10 @@ QPushButton#copyBtn {
     background: white;
     border: 2px solid #00a1e0;
     border-radius: 6px;
-    padding: 6px 14px;
+    padding: 6px;
     color: #00a1e0;
     font-weight: 600;
-    min-width: 80px;
+    min-width: 40px;
 }
 QPushButton#copyBtn:hover {
     background: #00a1e0;
@@ -146,12 +230,10 @@ QPushButton#removeBtn {
 QPushButton#removeBtn:hover { color: #e74c3c; }
 
 QPushButton#settingsBtn, QPushButton#historyBtn {
-    background: white;
     border: 2px solid #e0e0e0;
     border-radius: 8px;
     padding: 8px 16px;
     font-weight: 600;
-    color: #2c3e50;
 }
 QPushButton#settingsBtn:hover, QPushButton#historyBtn:hover {
     border-color: #00915A;

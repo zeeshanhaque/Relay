@@ -1,0 +1,18 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+    <qresource prefix="/icons">
+        <file alias="home.png">resources/icons/home.png</file>
+        <file alias="settings.png">resources/icons/settings.png</file>
+        <file alias="trash.png">resources/icons/trash.png</file>
+        <file alias="copy.png">resources/icons/copy.png</file>
+        <file alias="copy_done.png">resources/icons/copy_done.png</file>
+        <file alias="outlook.png">resources/icons/outlook.png</file>
+        <file alias="chevron_down.png">resources/icons/chevron_down.png</file>
+        <file alias="include.png">resources/icons/include.png</file>
+        <file alias="remove.png">resources/icons/remove.png</file>
+        <file alias="save.png">resources/icons/save.png</file>
+        <file alias="reload.png">resources/icons/reload.png</file>
+        <file alias="progress.png">resources/icons/progress.png</file>
+        <file alias="json.png">resources/icons/json.png</file>
+    </qresource>
+</RCC>

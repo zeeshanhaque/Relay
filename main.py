@@ -2,9 +2,11 @@
 Incident Management System - PySide6
 Entry point
 """
+import resources_rc
 import sys
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QIcon, QFont
+
 from app.main_window import MainWindow
 
 

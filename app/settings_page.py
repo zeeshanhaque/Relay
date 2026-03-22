@@ -5,19 +5,57 @@ Changes here sync back to the main form automatically.
 import json
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+    QDateTimeEdit, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QTextEdit, QTableWidget, QTableWidgetItem, QHeaderView,
-    QMessageBox, QTabWidget, QFrame, QScrollArea, QLineEdit,
-    QSplitter, QGroupBox, QFormLayout, QComboBox
+    QMessageBox, QStackedWidget, QStyledItemDelegate
 )
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFont, QColor
+from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtGui import QFont, QIcon
 
-from .data_manager import (
-    load_data, save_data, SERVICE_STATUSES, SERVICES, USERS,
-    EMAIL_LISTS
-)
-from .widgets import SectionTitle, SectionCard
+from .data_manager import load_data, save_data
+from .widgets import FiveMinDateTimeEdit
+
+
+class DateTimeDelegate(QStyledItemDelegate):
+    def createEditor(self, parent, option, index):
+        editor = FiveMinDateTimeEdit(parent)
+        editor.setDisplayFormat("dd/MM/yyyy HH:mm")
+        editor.setCalendarPopup(True)
+        editor.setButtonSymbols(QDateTimeEdit.UpDownArrows)
+        editor.setWrapping(True)
+        return editor
+
+    def setEditorData(self, editor, index):
+        from PySide6.QtCore import QDateTime
+        text = index.data() or ""
+        dt = QDateTime.fromString(text, "dd/MM/yyyy HH:mm")
+        if dt.isValid():
+            editor.setDateTime(dt)
+
+    def setModelData(self, editor, model, index):
+        model.setData(index, editor.dateTime().toString("dd/MM/yyyy HH:mm"))
+
+    def updateEditorGeometry(self, editor, option, index):
+        editor.setGeometry(option.rect)
+
+
+class MultiLineDelegate(QStyledItemDelegate):
+    def createEditor(self, parent, option, index):
+        editor = QTextEdit(parent)
+        editor.setAcceptRichText(False)
+        return editor
+
+    def setEditorData(self, editor, index):
+        editor.setPlainText(index.data() or "")
+
+    def setModelData(self, editor, model, index):
+        model.setData(index, editor.toPlainText())
+
+    def updateEditorGeometry(self, editor, option, index):
+        editor.setGeometry(option.rect)
+
+    def sizeHint(self, option, index):
+        return QSize(option.rect.width(), 50)
 
 
 class SettingsPage(QWidget):
@@ -40,105 +78,61 @@ class SettingsPage(QWidget):
 
         # Header row
         header = QHBoxLayout()
-        title = SectionTitle("⚙  Data & Settings Editor")
-        header.addWidget(title)
+
+        self._progress_btn = QPushButton()
+        self._progress_btn.setObjectName("settingsBtn")
+        self._progress_btn.setIcon(QIcon(":/icons/progress.png"))
+        self._progress_btn.setIconSize(QSize(20, 20))
+        self._progress_btn.clicked.connect(lambda: self._switch_view(0))
+        header.addWidget(self._progress_btn)
+
+        self._raw_btn = QPushButton()
+        self._raw_btn.setObjectName("settingsBtn")
+        self._raw_btn.setIcon(QIcon(":/icons/json.png"))
+        self._raw_btn.setIconSize(QSize(20, 20))
+        self._raw_btn.clicked.connect(lambda: self._switch_view(1))
+        header.addWidget(self._raw_btn)
+
         header.addStretch()
 
-        self._reload_btn = QPushButton("↺  Reload")
+        self._reload_btn = QPushButton()
         self._reload_btn.setObjectName("settingsBtn")
+        self._reload_btn.setIcon(QIcon(":/icons/reload.png"))
+        self._reload_btn.setIconSize(QSize(20, 20))
         self._reload_btn.clicked.connect(self._load)
         header.addWidget(self._reload_btn)
 
-        self._save_btn = QPushButton("💾  Save All Changes")
+        self._save_btn = QPushButton()
         self._save_btn.setObjectName("generateBtn")
+        self._save_btn.setIcon(QIcon(":/icons/save.png"))
+        self._save_btn.setIconSize(QSize(20, 20))
         self._save_btn.clicked.connect(self._save)
         header.addWidget(self._save_btn)
 
         layout.addLayout(header)
 
-        # Tabs
-        self._tabs = QTabWidget()
-        layout.addWidget(self._tabs)
+        # Stacked widget
+        self._stack = QStackedWidget()
+        self._stack.addWidget(self._build_progress_tab())
+        self._stack.addWidget(self._build_raw_tab())
+        layout.addWidget(self._stack)
 
-        self._tabs.addTab(self._build_form_tab(), "📋  Form State")
-        self._tabs.addTab(self._build_progress_tab(), "📝  Progress Log")
-        self._tabs.addTab(self._build_recipients_tab(), "📧  Recipients")
-        self._tabs.addTab(self._build_raw_tab(), "🔧  Raw JSON")
+        self._switch_view(0)
 
-    # ── Form State Tab ────────────────────────────────────────────────────────
 
-    def _build_form_tab(self) -> QWidget:
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setSpacing(12)
+    def _switch_view(self, index: int):
+        self._stack.setCurrentIndex(index)
+        active_style = (
+            "border: 2px solid #00915A; border-radius: 8px;"
+            "padding: 8px 16px; background: #e8f5f0; color: #00915A;"
+        )
+        inactive_style = (
+            "border: 2px solid #e0e0e0; border-radius: 8px;"
+            "padding: 8px 16px; background: white; color: #2c3e50;"
+        )
+        self._progress_btn.setStyleSheet(active_style if index == 0 else inactive_style)
+        self._raw_btn.setStyleSheet(active_style if index == 1 else inactive_style)
 
-        info = QLabel("Edit the current form state. Changes will reflect in the main form when saved.")
-        info.setStyleSheet("color: #7f8c8d; font-style: italic; padding: 4px;")
-        layout.addWidget(info)
-
-        form_frame = QGroupBox("Form Fields")
-        form_layout = QFormLayout(form_frame)
-        form_layout.setSpacing(12)
-
-        self._fs_services = QLineEdit()
-        self._fs_services.setPlaceholderText("Comma separated, e.g. BD, RN, DGT")
-        form_layout.addRow("Selected Services:", self._fs_services)
-
-        self._fs_status = QComboBox()
-        self._fs_status.addItems(SERVICE_STATUSES)
-        form_layout.addRow("Service Status:", self._fs_status)
-
-        self._fs_users = QLineEdit()
-        self._fs_users.setPlaceholderText("GLOBAL  or  APAC, EMEA")
-        form_layout.addRow("Selected Users:", self._fs_users)
-
-        self._fs_desc = QTextEdit()
-        self._fs_desc.setMaximumHeight(80)
-        form_layout.addRow("Description:", self._fs_desc)
-
-        self._fs_impact = QTextEdit()
-        self._fs_impact.setMaximumHeight(80)
-        form_layout.addRow("Impact:", self._fs_impact)
-
-        self._fs_start = QLineEdit()
-        self._fs_start.setPlaceholderText("ISO format: 2025-06-01T09:00:00")
-        form_layout.addRow("Start Time (ISO):", self._fs_start)
-
-        self._fs_end = QLineEdit()
-        self._fs_end.setPlaceholderText("ISO format: 2025-06-01T10:00:00")
-        form_layout.addRow("End Time (ISO):", self._fs_end)
-
-        self._fs_next = QLineEdit()
-        self._fs_next.setPlaceholderText("ISO format: 2025-06-01T11:00:00")
-        form_layout.addRow("Next Update (ISO):", self._fs_next)
-
-        layout.addWidget(form_frame)
-
-        # Incidents sub-table
-        inc_frame = QGroupBox("Incidents")
-        inc_layout = QVBoxLayout(inc_frame)
-
-        inc_btn_row = QHBoxLayout()
-        add_inc = QPushButton("+ Add Row")
-        add_inc.setObjectName("addIncBtn")
-        add_inc.clicked.connect(self._add_incident_row)
-        del_inc = QPushButton("− Remove Selected")
-        del_inc.setObjectName("clearBtn")
-        del_inc.clicked.connect(self._del_incident_row)
-        inc_btn_row.addWidget(add_inc)
-        inc_btn_row.addWidget(del_inc)
-        inc_btn_row.addStretch()
-        inc_layout.addLayout(inc_btn_row)
-
-        self._inc_table = QTableWidget(0, 2)
-        self._inc_table.setHorizontalHeaderLabels(["Incident Number", "Priority (P1/P2 or blank)"])
-        self._inc_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self._inc_table.setMinimumHeight(120)
-        inc_layout.addWidget(self._inc_table)
-
-        layout.addWidget(inc_frame)
-        layout.addStretch()
-        return page
 
     # ── Progress Log Tab ──────────────────────────────────────────────────────
 
@@ -155,10 +149,10 @@ class SettingsPage(QWidget):
         add_btn = QPushButton("+ Add Entry")
         add_btn.setObjectName("addIncBtn")
         add_btn.clicked.connect(self._add_progress_row)
-        del_btn = QPushButton("− Remove Selected")
+        del_btn = QPushButton("— Remove Selected")
         del_btn.setObjectName("clearBtn")
         del_btn.clicked.connect(self._del_progress_row)
-        clear_btn = QPushButton("🗑  Clear All")
+        clear_btn = QPushButton("Clear All")
         clear_btn.setObjectName("clearBtn")
         clear_btn.clicked.connect(self._clear_progress)
         btn_row.addWidget(add_btn)
@@ -169,55 +163,16 @@ class SettingsPage(QWidget):
 
         self._prog_table = QTableWidget(0, 2)
         self._prog_table.setHorizontalHeaderLabels(["Date/Time", "Details"])
-        self._prog_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self._prog_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        self._prog_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self._prog_table.setColumnWidth(0, 360)
         self._prog_table.setMinimumHeight(300)
+        self._prog_table.setItemDelegateForColumn(0, DateTimeDelegate(self._prog_table))
+        self._prog_table.setItemDelegateForColumn(1, MultiLineDelegate(self._prog_table))
         layout.addWidget(self._prog_table)
 
         return page
 
-    # ── Recipients Tab ────────────────────────────────────────────────────────
-
-    def _build_recipients_tab(self) -> QWidget:
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setSpacing(12)
-
-        info = QLabel(
-            "Edit the To address and BCC email lists for each region. "
-            "One email per line."
-        )
-        info.setWordWrap(True)
-        info.setStyleSheet("color: #7f8c8d; font-style: italic; padding: 4px;")
-        layout.addWidget(info)
-
-        to_grp = QGroupBox("To Recipient")
-        to_layout = QFormLayout(to_grp)
-        self._to_addr = QLineEdit()
-        self._to_addr.setPlaceholderText("e.g. manager@company.com")
-        to_layout.addRow("To:", self._to_addr)
-        layout.addWidget(to_grp)
-
-        bcc_grp = QGroupBox("BCC Recipients by Region")
-        bcc_layout = QFormLayout(bcc_grp)
-
-        self._bcc_apac = QTextEdit()
-        self._bcc_apac.setMaximumHeight(100)
-        self._bcc_apac.setPlaceholderText("One email per line")
-        bcc_layout.addRow("APAC:", self._bcc_apac)
-
-        self._bcc_emea = QTextEdit()
-        self._bcc_emea.setMaximumHeight(100)
-        self._bcc_emea.setPlaceholderText("One email per line")
-        bcc_layout.addRow("EMEA:", self._bcc_emea)
-
-        self._bcc_americas = QTextEdit()
-        self._bcc_americas.setMaximumHeight(100)
-        self._bcc_americas.setPlaceholderText("One email per line")
-        bcc_layout.addRow("AMERICAS:", self._bcc_americas)
-
-        layout.addWidget(bcc_grp)
-        layout.addStretch()
-        return page
 
     # ── Raw JSON Tab ──────────────────────────────────────────────────────────
 
@@ -246,37 +201,15 @@ class SettingsPage(QWidget):
         data = load_data()
         form = data.get("form", {})
 
-        # Form tab
-        self._fs_services.setText(", ".join(form.get("selected_services", [])))
-        idx = self._fs_status.findText(form.get("service_status", "Available"))
-        self._fs_status.setCurrentIndex(max(0, idx))
-        self._fs_users.setText(", ".join(form.get("selected_users", [])))
-        self._fs_desc.setPlainText(form.get("description", ""))
-        self._fs_impact.setPlainText(form.get("impact", ""))
-        self._fs_start.setText(form.get("start_time", ""))
-        self._fs_end.setText(form.get("end_time", ""))
-        self._fs_next.setText(form.get("next_update", ""))
-
-        # Incidents
-        incidents = form.get("incidents", [])
-        self._inc_table.setRowCount(len(incidents))
-        for i, inc in enumerate(incidents):
-            self._inc_table.setItem(i, 0, QTableWidgetItem(inc.get("number", "")))
-            self._inc_table.setItem(i, 1, QTableWidgetItem(inc.get("priority", "")))
-
         # Progress
         entries = data.get("progress_entries", [])
         self._prog_table.setRowCount(len(entries))
         for i, entry in enumerate(entries):
-            self._prog_table.setItem(i, 0, QTableWidgetItem(entry.get("datetime", "")))
+            dt_item = QTableWidgetItem(entry.get("datetime", ""))
+            dt_item.setTextAlignment(Qt.AlignCenter)
+            self._prog_table.setItem(i, 0, dt_item)
             self._prog_table.setItem(i, 1, QTableWidgetItem(entry.get("text", "")))
-
-        # Recipients
-        self._to_addr.setText(data.get("to_recipient", ""))
-        bcc = data.get("bcc_recipients", {})
-        self._bcc_apac.setPlainText("\n".join(bcc.get("APAC", EMAIL_LISTS["APAC"])))
-        self._bcc_emea.setPlainText("\n".join(bcc.get("EMEA", EMAIL_LISTS["EMEA"])))
-        self._bcc_americas.setPlainText("\n".join(bcc.get("AMERICAS", EMAIL_LISTS["AMERICAS"])))
+            self._prog_table.setRowHeight(i, 80)
 
         # Raw JSON
         self._raw_editor.setPlainText(json.dumps(data, indent=2, ensure_ascii=False))
@@ -284,49 +217,14 @@ class SettingsPage(QWidget):
     # ── Save ──────────────────────────────────────────────────────────────────
 
     def _save(self):
-        # Determine which tab is active
-        current_tab = self._tabs.currentIndex()
-
-        if current_tab == 3:
-            # Raw JSON tab - parse and save
+        if self._stack.currentIndex() == 1:
             try:
                 data = json.loads(self._raw_editor.toPlainText())
             except json.JSONDecodeError as e:
                 QMessageBox.critical(self, "Invalid JSON", f"JSON parse error:\n{e}")
                 return
         else:
-            # Build from UI widgets
             data = load_data()
-
-            # Form state
-            svc_text = self._fs_services.text()
-            selected_services = [s.strip() for s in svc_text.split(",") if s.strip()]
-            usr_text = self._fs_users.text()
-            selected_users = [u.strip() for u in usr_text.split(",") if u.strip()]
-
-            incidents = []
-            for row in range(self._inc_table.rowCount()):
-                num_item = self._inc_table.item(row, 0)
-                pri_item = self._inc_table.item(row, 1)
-                if num_item and num_item.text().strip():
-                    incidents.append({
-                        "number": num_item.text().strip(),
-                        "priority": pri_item.text().strip() if pri_item else ""
-                    })
-
-            data["form"] = {
-                "selected_services": selected_services,
-                "service_status": self._fs_status.currentText(),
-                "selected_users": selected_users,
-                "incidents": incidents,
-                "description": self._fs_desc.toPlainText(),
-                "impact": self._fs_impact.toPlainText(),
-                "start_time": self._fs_start.text().strip(),
-                "end_time": self._fs_end.text().strip(),
-                "next_update": self._fs_next.text().strip(),
-            }
-
-            # Progress entries
             entries = []
             for row in range(self._prog_table.rowCount()):
                 dt_item = self._prog_table.item(row, 0)
@@ -338,20 +236,10 @@ class SettingsPage(QWidget):
                     })
             data["progress_entries"] = entries
 
-            # Recipients
-            data["to_recipient"] = self._to_addr.text().strip()
-            data["bcc_recipients"] = {
-                "APAC": [e.strip() for e in self._bcc_apac.toPlainText().splitlines() if e.strip()],
-                "EMEA": [e.strip() for e in self._bcc_emea.toPlainText().splitlines() if e.strip()],
-                "AMERICAS": [e.strip() for e in self._bcc_americas.toPlainText().splitlines() if e.strip()],
-            }
-
         save_data(data)
-        # Refresh raw tab
         self._raw_editor.setPlainText(json.dumps(data, indent=2, ensure_ascii=False))
         self.dataChanged.emit(data)
-
-        QMessageBox.information(self, "Saved", "Settings saved and synced to main form.")
+        QMessageBox.information(self, "Saved", "Settings saved successfully.")
 
     # ── Progress table helpers ────────────────────────────────────────────────
 
@@ -359,8 +247,11 @@ class SettingsPage(QWidget):
         from datetime import datetime
         row = self._prog_table.rowCount()
         self._prog_table.insertRow(row)
+        self._prog_table.setRowHeight(row, 80)
         now = datetime.now().strftime("%d/%m/%Y %H:%M")
-        self._prog_table.setItem(row, 0, QTableWidgetItem(now))
+        dt_item = QTableWidgetItem(now)
+        dt_item.setTextAlignment(Qt.AlignCenter)
+        self._prog_table.setItem(row, 0, dt_item)
         self._prog_table.setItem(row, 1, QTableWidgetItem(""))
         self._prog_table.editItem(self._prog_table.item(row, 1))
 
@@ -376,16 +267,3 @@ class SettingsPage(QWidget):
         )
         if reply == QMessageBox.Yes:
             self._prog_table.setRowCount(0)
-
-    # ── Incident table helpers ────────────────────────────────────────────────
-
-    def _add_incident_row(self):
-        row = self._inc_table.rowCount()
-        self._inc_table.insertRow(row)
-        self._inc_table.setItem(row, 0, QTableWidgetItem("INC00000000"))
-        self._inc_table.setItem(row, 1, QTableWidgetItem(""))
-
-    def _del_incident_row(self):
-        rows = {idx.row() for idx in self._inc_table.selectedIndexes()}
-        for row in sorted(rows, reverse=True):
-            self._inc_table.removeRow(row)

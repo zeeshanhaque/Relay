@@ -2,11 +2,39 @@
 Custom reusable widgets for the Incident Management System.
 """
 from PySide6.QtWidgets import (
-    QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton,
-    QCheckBox, QFrame, QScrollArea, QSizePolicy
+    QApplication, QToolTip, QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton,
+    QCheckBox, QFrame, QScrollArea, QSizePolicy, QDateTimeEdit
 )
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFont
+from PySide6.QtCore import QDateTime, QTimer, Qt, Signal, QSize
+from PySide6.QtGui import QFont, QIcon
+
+
+class FiveMinDateTimeEdit(QDateTimeEdit):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFocusPolicy(Qt.StrongFocus)
+        self.setSpecialValueText(" ")
+
+
+    def stepBy(self, steps):
+        if self.currentSection() == QDateTimeEdit.Section.MinuteSection:
+            current = self.dateTime()
+            minutes = current.time().minute()
+            if steps > 0:
+                new_minutes = ((minutes // 5) + 1) * 5
+            else:
+                new_minutes = ((minutes - 1) // 5) * 5
+            new_minutes = new_minutes % 60
+            new_time = current.addSecs((new_minutes - minutes) * 60)
+            self.setDateTime(new_time)
+        else:
+            super().stepBy(steps)
+
+    def wheelEvent(self, event):
+        if self.hasFocus():
+            super().wheelEvent(event)
+        else:
+            event.ignore()
 
 
 class SectionCard(QFrame):
@@ -78,7 +106,7 @@ class MultiCheckDropdown(QWidget):
         main_layout.setSpacing(0)
 
         # Header button
-        self._header = QPushButton(self._placeholder + "  ▼")
+        self._header = QPushButton(self._placeholder)
         self._header.setStyleSheet("""
             QPushButton {
                 text-align: left;
@@ -88,8 +116,17 @@ class MultiCheckDropdown(QWidget):
                 background: white;
                 color: #2c3e50;
                 font-size: 13px;
+                background-image: url(:/icons/chevron_down.png);
+                background-repeat: no-repeat;
+                background-position: right center;
+                padding-right: 30px;
             }
-            QPushButton:hover { border-color: #00915A; background: #f0faf6; }
+            QPushButton:hover { border-color: #00915A; background-color: #f0faf6;
+                background-image: url(:/icons/chevron_down.png);
+                background-repeat: no-repeat;
+                background-position: right center;
+                padding-right: 30px;
+            }
         """)
         self._header.clicked.connect(self._toggle_popup)
         main_layout.addWidget(self._header)
@@ -135,10 +172,31 @@ class MultiCheckDropdown(QWidget):
 
     def _update_header(self, selected: list[str]):
         if selected:
-            text = ", ".join(selected) + "  ▼"
+            text = ", ".join(selected)
         else:
-            text = self._placeholder + "  ▼"
+            text = self._placeholder
         self._header.setText(text)
+        self._header.setStyleSheet("""
+            QPushButton {
+                text-align: left;
+                padding: 9px 14px;
+                border: 2px solid #e0e0e0;
+                border-radius: 8px;
+                background: white;
+                color: #2c3e50;
+                font-size: 13px;
+                background-image: url(:/icons/chevron_down.png);
+                background-repeat: no-repeat;
+                background-position: right center;
+                padding-right: 30px;
+            }
+            QPushButton:hover { border-color: #00915A; background-color: #f0faf6;
+                background-image: url(:/icons/chevron_down.png);
+                background-repeat: no-repeat;
+                background-position: right center;
+                padding-right: 30px;
+            }
+        """)
 
     def get_selected(self) -> list[str]:
         return [opt for opt, cb in self._checkboxes.items() if cb.isChecked()]
@@ -160,7 +218,7 @@ class MultiCheckDropdown(QWidget):
             cb.setChecked(False)
             cb.setEnabled(True)
             cb.blockSignals(False)
-        self._header.setText(self._placeholder + "  ▼")
+        self._header.setText(self._placeholder)
 
 
 class IncidentTag(QFrame):
@@ -190,8 +248,10 @@ class IncidentTag(QFrame):
         lbl.setStyleSheet("font-weight: 600; color: #007047; border: none; background: transparent;")
         layout.addWidget(lbl)
 
-        remove_btn = QPushButton("×")
+        remove_btn = QPushButton()
         remove_btn.setObjectName("removeBtn")
+        remove_btn.setIcon(QIcon(":/icons/remove.png"))
+        remove_btn.setIconSize(QSize(14, 14))
         remove_btn.setFixedSize(20, 20)
         remove_btn.clicked.connect(lambda: self.removeRequested.emit(self._index))
         layout.addWidget(remove_btn)
@@ -225,15 +285,16 @@ class CopyField(QWidget):
     """A labelled read-only text line with a copy button."""
     def __init__(self, label: str, parent=None):
         super().__init__(parent)
+        self.setFixedHeight(36)
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
 
         lbl = QLabel(label)
-        lbl.setFixedWidth(70)
+        lbl.setFixedWidth(40)
         lbl.setStyleSheet(
             "color: #7f8c8d; border: 1px solid #bbb; border-radius: 4px;"
-            " padding: 4px 8px; background: white; font-weight: 600;"
+            " padding: 4px 6px; background: white; font-weight: 600;"
         )
         layout.addWidget(lbl)
 
@@ -241,15 +302,29 @@ class CopyField(QWidget):
         self._text_lbl.setWordWrap(True)
         self._text_lbl.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self._text_lbl.setStyleSheet(
-            "border-bottom: 1px solid #2c3e50; padding: 4px 6px;"
+            "border: none; padding: 4px;"
             " background: transparent; color: #2c3e50;"
         )
-        self._text_lbl.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        layout.addWidget(self._text_lbl)
 
-        self._copy_btn = QPushButton("Copy")
+        scroll = QScrollArea()
+        scroll.setWidget(self._text_lbl)
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setStyleSheet(
+            "QScrollArea { border-bottom: 1px solid #2c3e50; background: transparent; }"
+            "QScrollBar:horizontal { height: 6px; background: #f0f0f0; border-radius: 3px; }"
+            "QScrollBar::handle:horizontal { background: #00915A; border-radius: 3px; min-width: 20px; }"
+            "QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; }"
+        )
+        scroll.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        layout.addWidget(scroll)
+
+        self._copy_btn = QPushButton()
         self._copy_btn.setObjectName("copyBtn")
-        self._copy_btn.setFixedWidth(70)
+        self._copy_btn.setIcon(QIcon(":/icons/copy.png"))
+        self._copy_btn.setIconSize(QSize(16, 16))
+        self._copy_btn.setFixedWidth(40)
         self._copy_btn.clicked.connect(self._copy)
         layout.addWidget(self._copy_btn)
 
@@ -260,9 +335,7 @@ class CopyField(QWidget):
         return self._text_lbl.text()
 
     def _copy(self):
-        from PySide6.QtWidgets import QApplication
         QApplication.clipboard().setText(self.get_text())
-        orig = self._copy_btn.text()
-        self._copy_btn.setText("✓ Copied!")
-        from PySide6.QtCore import QTimer
-        QTimer.singleShot(1500, lambda: self._copy_btn.setText(orig))
+        orig_icon = self._copy_btn.icon()
+        self._copy_btn.setIcon(QIcon(":/icons/copy_done.png"))
+        QTimer.singleShot(1500, lambda: self._copy_btn.setIcon(orig_icon))

@@ -6,20 +6,22 @@ from PySide6.QtWidgets import (
     QPushButton, QLabel, QFrame, QSplitter, QStackedWidget,
     QMessageBox, QApplication
 )
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtCore import Qt, QSize, QTimer
 from PySide6.QtGui import QFont, QIcon, QColor, QPalette
+
+from datetime import datetime
 
 from .styles import MAIN_STYLE
 from .form_panel import FormPanel
 from .output_panel import OutputPanel
 from .settings_page import SettingsPage
-from .data_manager import clear_data, load_data, save_data
+from .data_manager import clear_data, load_data, save_data, round_to_quarter
 
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Incident Management System")
+        self.setWindowTitle("Relay - Incident Communication")
         self.setMinimumSize(1200, 720)
         self.resize(1400, 820)
         self.setStyleSheet(MAIN_STYLE)
@@ -66,6 +68,54 @@ class MainWindow(QMainWindow):
         self._form_panel.generateRequested.connect(self._output_panel.populate)
         self._settings_page.dataChanged.connect(self._on_settings_saved)
 
+        self._switch_main_view(0)
+        self._auto_populate()
+
+    
+    def _auto_populate(self):
+        data = load_data()
+        form = data.get("form", {})
+
+        if not (
+            form.get("selected_services")
+            and form.get("selected_users")
+            and form.get("incidents")
+            and form.get("description")
+            and form.get("impact")
+        ):
+            return
+
+        status = form.get("service_status", "Degraded")
+
+        payload = {
+            "services":    form.get("selected_services", []),
+            "users":       form.get("selected_users", []),
+            "status":      status,
+            "incidents":   form.get("incidents", []),
+            "start_time":  form.get("start_time", ""),
+            "end_time":    form.get("end_time", ""),
+            "next_update": form.get("next_update", ""),
+            "description": form.get("description", ""),
+            "impact":      form.get("impact", ""),
+        }
+
+        QTimer.singleShot(100, lambda: self._output_panel.populate(payload))
+
+
+    def _switch_main_view(self, index: int):
+        self._stack.setCurrentIndex(index)
+        active_style = (
+            "border: 2px solid #00915A; border-radius: 8px;"
+            "padding: 8px 16px; background: #e8f5f0;"
+        )
+        inactive_style = (
+            "border: 2px solid #e0e0e0; border-radius: 8px;"
+            "padding: 8px 16px; background: white;"
+        )
+        self._main_btn.setStyleSheet(active_style if index == 0 else inactive_style)
+        self._settings_btn.setStyleSheet(active_style if index == 1 else inactive_style)
+
+
     def _build_header(self) -> QWidget:
         header = QFrame()
         header.setObjectName("card")
@@ -75,7 +125,7 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(20, 12, 20, 12)
 
         # Logo
-        logo = QLabel("IM")
+        logo = QLabel("R")
         logo.setFixedSize(44, 44)
         logo.setAlignment(Qt.AlignCenter)
         logo.setStyleSheet(
@@ -86,38 +136,45 @@ class MainWindow(QMainWindow):
         )
         layout.addWidget(logo)
 
-        title = QLabel("Incident Management System")
+        title = QLabel("Relay - Incident Communication")
         title.setStyleSheet("font-size: 22px; font-weight: 700; color: #2c3e50;")
         layout.addWidget(title)
 
         layout.addStretch()
 
-        # Nav buttons
-        self._main_btn = QPushButton("📋  Main Form")
+        self._main_btn = QPushButton()
         self._main_btn.setObjectName("settingsBtn")
-        self._main_btn.clicked.connect(lambda: self._stack.setCurrentIndex(0))
+        self._main_btn.setIcon(QIcon(":/icons/home.png"))
+        self._main_btn.setIconSize(QSize(20, 20))
+        self._main_btn.clicked.connect(lambda: self._switch_main_view(0))
         layout.addWidget(self._main_btn)
 
-        self._settings_btn = QPushButton("⚙  Settings / Data")
+        self._settings_btn = QPushButton()
         self._settings_btn.setObjectName("settingsBtn")
+        self._settings_btn.setIcon(QIcon(":/icons/settings.png"))
+        self._settings_btn.setIconSize(QSize(20, 20))
         self._settings_btn.clicked.connect(self._open_settings)
         layout.addWidget(self._settings_btn)
 
-        clear_btn = QPushButton("🗑  Clear All")
+        clear_btn = QPushButton()
         clear_btn.setObjectName("clearBtn")
+        clear_btn.setIcon(QIcon(":/icons/trash.png"))
+        clear_btn.setIconSize(QSize(20, 20))
         clear_btn.clicked.connect(self._clear_all)
         layout.addWidget(clear_btn)
 
         return header
+    
 
     def _open_settings(self):
         self._settings_page._load()  # Refresh before showing
-        self._stack.setCurrentIndex(1)
+        self._switch_main_view(1)
 
     def _on_settings_saved(self, data: dict):
-        """Called when settings page saves – sync form panel."""
+        """Called when settings page saves - sync form panel."""
         self._form_panel.reload_from_data(data)
-        self._stack.setCurrentIndex(0)
+        self._switch_main_view(0)
+        self._auto_populate()
 
     def _clear_all(self):
         reply = QMessageBox.question(
@@ -128,3 +185,5 @@ class MainWindow(QMainWindow):
         if reply == QMessageBox.Yes:
             clear_data()
             self._form_panel.clear_form()
+            self._output_panel.clear()          # ← clear output panel
+            self._settings_page._load()         # ← refresh JSON view

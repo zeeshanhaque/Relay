@@ -9,12 +9,12 @@ from PySide6.QtWidgets import (
     QFrame, QScrollArea, QTableWidget, QTableWidgetItem,
     QHeaderView, QSizePolicy, QMessageBox, QApplication
 )
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont, QColor
+from PySide6.QtCore import QSize, QTimer, Qt, QMimeData
+from PySide6.QtGui import QFont, QColor, QIcon, QPixmap, QClipboard
 
 from .widgets import SectionTitle, SectionCard, CopyField, StatusBadge
 from .data_manager import (
-    get_recipients, format_list, format_datetime_display, load_data
+    get_recipients, format_list, format_datetime_display, load_data, TO_RECIPIENT
 )
 from .styles import STATUS_COLORS
 
@@ -44,10 +44,9 @@ class OutputPanel(QWidget):
 
         card = SectionCard()
         layout.addWidget(card)
-        layout.addStretch()
 
         card_layout = card.layout()
-        card_layout.addWidget(SectionTitle("Generated Output"))
+        card_layout.addWidget(SectionTitle("Generated Notification"))
 
         # Email header fields
         self.to_field = CopyField("To")
@@ -73,13 +72,17 @@ class OutputPanel(QWidget):
         btn_row = QHBoxLayout()
         btn_row.setSpacing(12)
 
-        self._copy_table_btn = QPushButton("📋  Copy Table")
+        self._copy_table_btn = QPushButton()
         self._copy_table_btn.setObjectName("copyBtn")
+        self._copy_table_btn.setIcon(QIcon(":/icons/copy.png"))
+        self._copy_table_btn.setIconSize(QSize(20, 20))
         self._copy_table_btn.setMinimumHeight(40)
         self._copy_table_btn.clicked.connect(self._copy_table_html)
 
-        self._outlook_btn = QPushButton("📧  Open in Outlook")
+        self._outlook_btn = QPushButton()
         self._outlook_btn.setObjectName("generateBtn")
+        self._outlook_btn.setIcon(QIcon(":/icons/outlook.png"))
+        self._outlook_btn.setIconSize(QSize(20, 20))
         self._outlook_btn.setMinimumHeight(40)
         self._outlook_btn.clicked.connect(self._open_outlook)
 
@@ -118,8 +121,8 @@ class OutputPanel(QWidget):
         incidents_str = ", ".join(inc_parts)
 
         # Recipients
-        to_addr = data.get("to_recipient", "zeeshan@gmail.com")
-        bcc_emails = get_recipients(users, data.get("bcc_recipients", {}))
+        to_addr = TO_RECIPIENT
+        bcc_emails = get_recipients(users)
         bcc_str = "; ".join(bcc_emails)
         subject = f"[{status}] FOREX Incident Management Notification : {services_str}"
 
@@ -150,6 +153,17 @@ class OutputPanel(QWidget):
 
         self._copy_table_btn.show()
         self._outlook_btn.show()
+
+    
+    def clear(self):
+        self.to_field.set_text("")
+        self.bcc_field.set_text("")
+        self.subject_field.set_text("")
+        self._table_widget._table.clearContents()
+        self._table_widget._table.setRowCount(0)
+        self._copy_table_btn.hide()
+        self._outlook_btn.hide()
+        self._current_payload = None
 
     # ── Outlook integration ───────────────────────────────────────────────────
 
@@ -189,8 +203,8 @@ class OutputPanel(QWidget):
         end_str = format_datetime_display(payload.get("end_time", ""))
         next_str = format_datetime_display(payload.get("next_update", ""))
 
-        to_addr = data.get("to_recipient", "")
-        bcc_emails = get_recipients(users, data.get("bcc_recipients", {}))
+        to_addr = TO_RECIPIENT
+        bcc_emails = get_recipients(users)
         bcc_str = "; ".join(bcc_emails)
         subject = f"[{status}] FOREX Incident Management Notification : {services}"
 
@@ -295,17 +309,14 @@ class OutputPanel(QWidget):
             progress_entries=progress_entries,
         )
 
-        from PySide6.QtGui import QClipboard
-        from PySide6.QtCore import QMimeData
         mime = QMimeData()
         mime.setHtml(html)
         mime.setText(html)
         QApplication.clipboard().setMimeData(mime)
 
-        orig = self._copy_table_btn.text()
-        self._copy_table_btn.setText("✓ Copied!")
-        from PySide6.QtCore import QTimer
-        QTimer.singleShot(1500, lambda: self._copy_table_btn.setText(orig))
+        orig_icon = self._copy_table_btn.icon()
+        self._copy_table_btn.setIcon(QIcon(":/icons/copy_done.png"))
+        QTimer.singleShot(1500, lambda: self._copy_table_btn.setIcon(orig_icon))
 
 
 # ── Outlook helpers ───────────────────────────────────────────────────────────
@@ -316,13 +327,13 @@ def _get_outlook_instance(win32com):
     Returns the object on success, or None if all attempts fail.
 
     Strategy order:
-      1. GetActiveObject  – reuse an already-running Outlook instance
+      1. GetActiveObject  - reuse an already-running Outlook instance
          (avoids re-registering COM class; works even when registry ProgID
           is missing for Dispatch)
       2. Dispatch with the canonical ProgID "Outlook.Application"
       3. Dispatch with the versioned ProgIDs for Outlook 2016-2021/365
          (sometimes only the versioned key exists in the registry)
-      4. EnsureDispatch   – forces early-binding / COM type-lib generation
+      4. EnsureDispatch   - forces early-binding / COM type-lib generation
     """
     # 1. Latch onto a running Outlook process (most reliable)
     try:
@@ -475,13 +486,25 @@ class NotificationTable(QWidget):
             kind = row[0]
 
             if kind == "title":
+                # Logo cell (left half)
+                import base64, os
+                logo_path = os.path.join(os.path.dirname(__file__), "..", "resources", "assets", "BNPP_logo.jpg")
+                if os.path.exists(logo_path):
+                    logo_lbl = QLabel()
+                    pixmap = QPixmap(logo_path)
+                    logo_lbl.setPixmap(pixmap.scaledToHeight(40, Qt.SmoothTransformation))
+                    logo_lbl.setAlignment(Qt.AlignCenter)
+                    self._table.setCellWidget(r, 0, logo_lbl)
+                    self._table.setSpan(r, 0, 1, 2)
+                
+                # Title cell (right half)
                 item = QTableWidgetItem(row[1])
                 item.setTextAlignment(Qt.AlignCenter)
                 item.setFont(self._bold_font(14))
                 item.setForeground(QColor("#00915A"))
-                self._table.setItem(r, 0, item)
-                self._table.setSpan(r, 0, 1, 4)
-                self._table.setRowHeight(r, 50)
+                self._table.setItem(r, 2, item)
+                self._table.setSpan(r, 2, 1, 2)
+                self._table.setRowHeight(r, 60)
                 r += 1
 
             elif kind == "detail":
@@ -604,6 +627,19 @@ def build_email_html(services, users, status, incidents_str, start_time,
                      end_time, next_update, description, impact,
                      progress_entries: list[dict]) -> str:
 
+    import base64, os
+    logo_b64 = ""
+    logo_path = os.path.join(os.path.dirname(__file__), "..", "resources", "assets", "BNPP_logo.jpg")
+    if os.path.exists(logo_path):
+        with open(logo_path, "rb") as f:
+            logo_b64 = base64.b64encode(f.read()).decode()
+    
+    logo_html = (
+        f'<img src="data:image/jpeg;base64,{logo_b64}" alt="Logo" style="width:100%; height:100%;"/>'
+        if logo_b64 else ""
+    )
+
+
     status_styles = {
         "Available":        "background:#6fc040;color:white;",
         "Unavailable":      "background:#e74c3c;color:white;",
@@ -639,7 +675,7 @@ def build_email_html(services, users, status, incidents_str, start_time,
 <style>
   body {{ font-family: Arial, Helvetica, sans-serif; font-size: 13px; }}
   table {{ border-collapse: collapse; width: 100%; }}
-  td {{ border: 1px solid #000; padding: 8px; height: 36px; }}
+  td {{ border: 1px solid #000; padding: 6px; height: 36px; }}
   .q {{ background: #00915A; color: white; font-weight: bold; width: 25%; }}
   .a {{ width: 25%; }}
   .title {{ color: #00915A; font-weight: bold; font-size: 17px; text-align: center; }}
@@ -648,7 +684,10 @@ def build_email_html(services, users, status, incidents_str, start_time,
 <body>
 <table>
   <tr>
-    <td colspan="4" class="title">FOREX Service Desk Incident Notification</td>
+    <td colspan="2" style="text-align:center; vertical-align:middle; border:1px solid #000; width:100%; height:100%; padding:0;">
+      {logo_html}
+    </td>
+    <td colspan="2" class="title">FOREX Service Desk Incident Notification</td>
   </tr>
   <tr>
     <td class="q">Service/Application(s) Impacted</td>

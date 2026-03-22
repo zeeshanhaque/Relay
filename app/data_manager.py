@@ -4,12 +4,14 @@ All saved data lives in data/incidents_data.json
 """
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 DATA_FILE = DATA_DIR / "incidents_data.json"
+
+TO_RECIPIENT = "zeeshan@gmail.com"
 
 EMAIL_LISTS = {
     "APAC": [
@@ -37,14 +39,14 @@ EMAIL_LISTS = {
 
 SERVICES = ["BD", "MR V", "MR L", "RN", "RN SN", "DGT", "SAM", "CRT", "RXL"]
 USERS = ["GLOBAL", "APAC", "EMEA", "AMERICAS"]
-SERVICE_STATUSES = ["Available", "Unavailable", "Degraded", "Under Observation"]
+SERVICE_STATUSES = ["Degraded", "Unavailable", "Under Observation", "Available"]
 
 
 def _default_data() -> dict:
     return {
         "form": {
             "selected_services": [],
-            "service_status": "Available",
+            "service_status": "Degraded",
             "selected_users": [],
             "incidents": [],
             "start_time": "",
@@ -54,12 +56,6 @@ def _default_data() -> dict:
             "impact": "",
         },
         "progress_entries": [],
-        "to_recipient": "zeeshan@gmail.com",
-        "bcc_recipients": {
-            "APAC": EMAIL_LISTS["APAC"],
-            "EMEA": EMAIL_LISTS["EMEA"],
-            "AMERICAS": EMAIL_LISTS["AMERICAS"],
-        },
     }
 
 
@@ -92,16 +88,15 @@ def clear_data() -> dict:
     return data
 
 
-def get_recipients(selected_users: list[str], bcc_config: dict) -> list[str]:
+def get_recipients(selected_users: list[str]) -> list[str]:
     """Return deduplicated flat list of email recipients based on selected user regions."""
     all_recipients = []
     if "GLOBAL" in selected_users:
         for region in ["APAC", "EMEA", "AMERICAS"]:
-            all_recipients.extend(bcc_config.get(region, []))
+            all_recipients.extend(EMAIL_LISTS.get(region, []))
     else:
         for region in selected_users:
-            all_recipients.extend(bcc_config.get(region, []))
-    # Deduplicate preserving order
+            all_recipients.extend(EMAIL_LISTS.get(region, []))
     seen = set()
     result = []
     for email in all_recipients:
@@ -127,7 +122,7 @@ def round_to_quarter(dt: datetime) -> datetime:
     rounded = round(minutes / 15) * 15
     if rounded == 60:
         dt = dt.replace(minute=0, second=0, microsecond=0)
-        dt = dt.replace(hour=dt.hour + 1)
+        dt = dt + timedelta(hours=1)
     else:
         dt = dt.replace(minute=rounded, second=0, microsecond=0)
     return dt
