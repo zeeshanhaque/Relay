@@ -26,6 +26,7 @@ class MainWindow(QMainWindow):
         self.resize(1400, 820)
         self.setStyleSheet(MAIN_STYLE)
         self._build_ui()
+        self.showMaximized()
 
     def _build_ui(self):
         central = QWidget()

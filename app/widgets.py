@@ -8,6 +8,10 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import QDateTime, QTimer, Qt, Signal, QSize
 from PySide6.QtGui import QFont, QIcon
 
+from datetime import datetime, timedelta
+
+from .data_manager import load_data, round_to_quarter
+
 
 class FiveMinDateTimeEdit(QDateTimeEdit):
     def __init__(self, parent=None):
@@ -15,8 +19,11 @@ class FiveMinDateTimeEdit(QDateTimeEdit):
         self.setFocusPolicy(Qt.StrongFocus)
         self.setSpecialValueText(" ")
 
-
     def stepBy(self, steps):
+        # If at minimum (blank), set base time before stepping
+        if self.dateTime() == self.minimumDateTime():
+            self._set_default_datetime()
+
         if self.currentSection() == QDateTimeEdit.Section.MinuteSection:
             current = self.dateTime()
             minutes = current.time().minute()
@@ -30,11 +37,54 @@ class FiveMinDateTimeEdit(QDateTimeEdit):
         else:
             super().stepBy(steps)
 
+    def _set_default_datetime(self):
+        try:
+            data = load_data()
+            progress_entries = data.get("progress_entries", [])
+            if progress_entries:
+                latest = max(
+                    progress_entries,
+                    key=lambda e: datetime.strptime(e["datetime"], "%d/%m/%Y %H:%M")
+                )
+                base_dt = datetime.strptime(latest["datetime"], "%d/%m/%Y %H:%M")
+            else:
+                # Fall back to start_time from form if available
+                start_iso = data.get("form", {}).get("start_time", "")
+                if start_iso:
+                    base_dt = datetime.fromisoformat(start_iso)
+                else:
+                    base_dt = datetime.now()
+            default_dt = round_to_quarter(base_dt + timedelta(hours=1))
+            self.setDateTime(QDateTime(
+                default_dt.year, default_dt.month, default_dt.day,
+                default_dt.hour, default_dt.minute, 0
+            ))
+        except Exception:
+            # Fallback to current time + 1hr
+            dt = datetime.now() + timedelta(hours=1)
+            self.setDateTime(QDateTime(
+                dt.year, dt.month, dt.day, dt.hour, dt.minute, 0
+            ))
+
     def wheelEvent(self, event):
         if self.hasFocus():
             super().wheelEvent(event)
         else:
             event.ignore()
+
+    def mousePressEvent(self, event):
+        super().mousePressEvent(event)
+        # If at minimum (blank), navigate calendar to current month on popup open
+        if self.dateTime() == self.minimumDateTime():
+            from PySide6.QtCore import QTimer, QDate
+            QTimer.singleShot(0, self._fix_calendar_page)
+
+    def _fix_calendar_page(self):
+        cal = self.calendarWidget()
+        if cal and cal.isVisible():
+            from PySide6.QtCore import QDate
+            today = QDate.currentDate()
+            cal.setCurrentPage(today.year(), today.month())
 
 
 class SectionCard(QFrame):

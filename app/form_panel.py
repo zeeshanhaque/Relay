@@ -23,6 +23,11 @@ from .data_manager import (
 )
 
 
+class NoScrollComboBox(QComboBox):
+    def wheelEvent(self, event):
+        event.ignore()
+
+
 class FormPanel(QWidget):
     """Left panel: all input fields."""
     generateRequested = Signal(dict)
@@ -70,7 +75,7 @@ class FormPanel(QWidget):
         row1.addLayout(svc_group)
 
         status_group = self._field_group("Service Status", required=True)
-        self.status_combo = QComboBox()
+        self.status_combo = NoScrollComboBox()
         self.status_combo.addItems(SERVICE_STATUSES)
         self.status_combo.setStyleSheet("""
             QComboBox {
@@ -525,11 +530,19 @@ class FormPanel(QWidget):
         # Write generate-only fields to JSON
         data = load_data()
         data["form"]["service_status"] = status
+        data["form"]["start_time"] = start_dt.isoformat()
         if end_dt:
             data["form"]["end_time"] = end_dt.isoformat()
         if next_dt:
             data["form"]["next_update"] = next_dt.isoformat()
         save_data(data)
+
+        self.start_time.blockSignals(True)
+        self.start_time.setDateTime(QDateTime(
+            start_dt.year, start_dt.month, start_dt.day,
+            start_dt.hour, start_dt.minute, 0
+        ))
+        self.start_time.blockSignals(False)
 
         # Reset next_update input to blank
         self.next_update.blockSignals(True)

@@ -14,7 +14,7 @@ from PySide6.QtGui import QFont, QColor, QIcon, QPixmap, QClipboard
 
 from .widgets import SectionTitle, SectionCard, CopyField, StatusBadge
 from .data_manager import (
-    get_recipients, format_list, format_datetime_display, load_data, TO_RECIPIENT
+    get_recipients, format_list, format_datetime_display, load_data, TO_RECIPIENT, sort_progress_entries
 )
 from .styles import STATUS_COLORS
 
@@ -136,7 +136,7 @@ class OutputPanel(QWidget):
         next_str = format_datetime_display(payload.get("next_update", ""))
 
         # Progress entries from storage
-        progress_entries = data.get("progress_entries", [])
+        progress_entries = sort_progress_entries(data.get("progress_entries", []))
 
         self._table_widget.populate(
             services=services_str,
@@ -635,7 +635,7 @@ def build_email_html(services, users, status, incidents_str, start_time,
             logo_b64 = base64.b64encode(f.read()).decode()
     
     logo_html = (
-        f'<img src="data:image/jpeg;base64,{logo_b64}" alt="Logo" style="width:100%; height:100%;"/>'
+        f'<img src="data:image/jpeg;base64,{logo_b64}" alt="Logo" style="max-width:150px; width:auto; height:auto;"/>'
         if logo_b64 else ""
     )
 
@@ -656,7 +656,7 @@ def build_email_html(services, users, status, incidents_str, start_time,
                 border:1px solid #000;padding:8px;">Progress in Chronological Order</td>
         </tr>
         <tr>
-            <td style="background:#f0f0f0;font-weight:bold;text-align:center;
+            <td colspan="1" style="background:#f0f0f0;font-weight:bold;text-align:center;
                 border:1px solid #000;padding:8px;">Date/Time [LT]</td>
             <td colspan="3" style="background:#f0f0f0;font-weight:bold;text-align:center;
                 border:1px solid #000;padding:8px;">Details</td>
@@ -665,7 +665,7 @@ def build_email_html(services, users, status, incidents_str, start_time,
         for entry in progress_entries:
             progress_rows += f"""
         <tr>
-            <td style="text-align:center;border:1px solid #000;padding:8px;">{entry['datetime']}</td>
+            <td colspan="1" style="text-align:center;border:1px solid #000;padding:8px;">{entry['datetime']}</td>
             <td colspan="3" style="border:1px solid #000;padding:8px;">{entry['text']}</td>
         </tr>"""
 
@@ -684,7 +684,7 @@ def build_email_html(services, users, status, incidents_str, start_time,
 <body>
 <table>
   <tr>
-    <td colspan="2" style="text-align:center; vertical-align:middle; border:1px solid #000; width:100%; height:100%; padding:0;">
+    <td colspan="2" style="text-align:center; vertical-align:middle; border:1px solid #000;">
       {logo_html}
     </td>
     <td colspan="2" class="title">FOREX Service Desk Incident Notification</td>

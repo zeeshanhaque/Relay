@@ -9,12 +9,13 @@ from PySide6.QtWidgets import (
     QTextEdit, QTableWidget, QTableWidgetItem, QHeaderView,
     QMessageBox, QStackedWidget, QStyledItemDelegate
 )
-from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtCore import QSize, Qt, Signal, QDateTime
 from PySide6.QtGui import QFont, QIcon
 
-from .data_manager import load_data, save_data
+from .data_manager import load_data, save_data, sort_progress_entries, round_to_quarter
 from .widgets import FiveMinDateTimeEdit
 
+from datetime import datetime
 
 class DateTimeDelegate(QStyledItemDelegate):
     def createEditor(self, parent, option, index):
@@ -26,7 +27,6 @@ class DateTimeDelegate(QStyledItemDelegate):
         return editor
 
     def setEditorData(self, editor, index):
-        from PySide6.QtCore import QDateTime
         text = index.data() or ""
         dt = QDateTime.fromString(text, "dd/MM/yyyy HH:mm")
         if dt.isValid():
@@ -202,7 +202,7 @@ class SettingsPage(QWidget):
         form = data.get("form", {})
 
         # Progress
-        entries = data.get("progress_entries", [])
+        entries = sort_progress_entries(data.get("progress_entries", []))
         self._prog_table.setRowCount(len(entries))
         for i, entry in enumerate(entries):
             dt_item = QTableWidgetItem(entry.get("datetime", ""))
@@ -230,14 +230,23 @@ class SettingsPage(QWidget):
                 dt_item = self._prog_table.item(row, 0)
                 txt_item = self._prog_table.item(row, 1)
                 if dt_item and txt_item:
+                    dt_str = dt_item.text().strip()
+                    # Round to nearest 15 minutes
+                    try:
+                        dt = datetime.strptime(dt_str, "%d/%m/%Y %H:%M")
+                        dt = round_to_quarter(dt)
+                        dt_str = dt.strftime("%d/%m/%Y %H:%M")
+                    except ValueError:
+                        pass  # keep original if parsing fails
                     entries.append({
-                        "datetime": dt_item.text().strip(),
+                        "datetime": dt_str,
                         "text": txt_item.text().strip()
                     })
-            data["progress_entries"] = entries
+            data["progress_entries"] = sort_progress_entries(entries)
 
         save_data(data)
         self._raw_editor.setPlainText(json.dumps(data, indent=2, ensure_ascii=False))
+        self._load()  # ← reload to reflect sorted order in table
         self.dataChanged.emit(data)
         QMessageBox.information(self, "Saved", "Settings saved successfully.")
 

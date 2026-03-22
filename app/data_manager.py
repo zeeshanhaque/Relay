@@ -148,3 +148,15 @@ def validate_incident(num: str) -> tuple[bool, bool]:
     if re.match(r"^INC[0-9]{8}$", num):
         return True, num.startswith("INC0")
     return False, False
+
+
+def sort_progress_entries(entries: list[dict]) -> list[dict]:
+    """Sort progress entries in descending order by datetime."""
+    try:
+        return sorted(
+            entries,
+            key=lambda e: datetime.strptime(e["datetime"], "%d/%m/%Y %H:%M"),
+            reverse=True
+        )
+    except (ValueError, KeyError):
+        return entries
