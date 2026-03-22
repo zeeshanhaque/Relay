@@ -7,15 +7,13 @@ from PySide6.QtWidgets import (
     QMessageBox, QApplication
 )
 from PySide6.QtCore import Qt, QSize, QTimer
-from PySide6.QtGui import QFont, QIcon, QColor, QPalette
-
-from datetime import datetime
+from PySide6.QtGui import QIcon
 
 from .styles import MAIN_STYLE
 from .form_panel import FormPanel
 from .output_panel import OutputPanel
 from .settings_page import SettingsPage
-from .data_manager import clear_data, load_data, save_data, round_to_quarter
+from .data_manager import clear_data, load_data
 
 
 class MainWindow(QMainWindow):

@@ -2,7 +2,6 @@
 Output Panel - displays generated email notification with copy buttons
 and the Outlook integration button.
 """
-from datetime import datetime
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
@@ -10,13 +9,14 @@ from PySide6.QtWidgets import (
     QHeaderView, QSizePolicy, QMessageBox, QApplication
 )
 from PySide6.QtCore import QSize, QTimer, Qt, QMimeData
-from PySide6.QtGui import QFont, QColor, QIcon, QPixmap, QClipboard
+from PySide6.QtGui import QFont, QColor, QIcon, QPixmap
 
-from .widgets import SectionTitle, SectionCard, CopyField, StatusBadge
+from .widgets import SectionTitle, SectionCard, CopyField
+from .config import TO_RECIPIENT
 from .data_manager import (
-    get_recipients, format_list, format_datetime_display, load_data, TO_RECIPIENT, sort_progress_entries
+    get_recipients, format_list, format_datetime_display, load_data,
+    sort_progress_entries
 )
-from .styles import STATUS_COLORS
 
 
 class OutputPanel(QWidget):

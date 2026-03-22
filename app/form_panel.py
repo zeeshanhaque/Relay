@@ -8,18 +8,18 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QLineEdit, QTextEdit, QComboBox,
     QCheckBox, QFrame, QScrollArea,
-    QMessageBox, QSizePolicy
+    QMessageBox
 )
-from PySide6.QtCore import Qt, Signal, QDateTime, QTimer, QSize
-from PySide6.QtGui import QFont, QPalette, QColor, QIcon
+from PySide6.QtCore import Qt, Signal, QDateTime, QSize
+from PySide6.QtGui import QPalette, QColor, QIcon
 
 from .widgets import (
     SectionTitle, FieldLabel, MultiCheckDropdown,
     IncidentTag, SectionCard, FiveMinDateTimeEdit
 )
+from .config import SERVICES, USERS, SERVICE_STATUSES
 from .data_manager import (
-    SERVICES, USERS, SERVICE_STATUSES, validate_incident,
-    round_to_quarter, save_data, load_data
+    validate_incident, round_to_quarter, save_data, load_data
 )
 
 
@@ -239,7 +239,7 @@ class FormPanel(QWidget):
 
         self.inc_input = QLineEdit()
         self.inc_input.setPlaceholderText("INC00000000")
-        self.inc_input.setMaxLength(11)
+        self.inc_input.setMaxLength(12)
         self.inc_input.setStyleSheet("""
             QLineEdit {
                 border: none;
@@ -277,7 +277,7 @@ class FormPanel(QWidget):
 
         grp.addLayout(row)
 
-        self.inc_error = QLabel("⚠ Format must be INC + 8 digits (e.g. INC00000001)")
+        self.inc_error = QLabel("⚠ Format must be INC + 7 or 8 digits (e.g. INC12345678)")
         self.inc_error.setStyleSheet("color: #e74c3c; font-size: 11px;")
         self.inc_error.hide()
         grp.addWidget(self.inc_error)
@@ -393,7 +393,7 @@ class FormPanel(QWidget):
             QMessageBox.warning(self, "Missing", "Please enter an incident number.")
             return
 
-        is_valid, starts_zero = validate_incident(num)
+        is_valid, _ = validate_incident(num)
         if not is_valid:
             self.inc_error.show()
             return
@@ -403,18 +403,9 @@ class FormPanel(QWidget):
             QMessageBox.warning(self, "Duplicate", "This incident has already been added.")
             return
 
-        if starts_zero:
-            reply = QMessageBox.question(
-                self, "Confirm", "Incident number starts with Zero. Add anyway?",
-                QMessageBox.Yes | QMessageBox.No
-            )
-            if reply != QMessageBox.Yes:
-                return
-
         priority = "P1" if self.p1_check.isChecked() else ("P2" if self.p2_check.isChecked() else "")
         self._incidents.append({"number": num, "priority": priority})
 
-        # Reset inputs
         self.inc_input.clear()
         self.p1_check.setChecked(False)
         self.p2_check.setChecked(False)

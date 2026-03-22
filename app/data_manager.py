@@ -3,7 +3,6 @@ Data Manager - Handles JSON persistence for the Incident Management System.
 All saved data lives in data/incidents_data.json
 """
 import json
-import os
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -142,11 +141,11 @@ def format_datetime_display(iso_str: str) -> str:
 def validate_incident(num: str) -> tuple[bool, bool]:
     """
     Returns (is_valid, starts_with_zero).
-    Format must be INC followed by exactly 8 digits.
+    Format must be INC followed by 7 or 8 digits.
     """
     import re
-    if re.match(r"^INC[0-9]{8}$", num):
-        return True, num.startswith("INC0")
+    if re.match(r"^INC[0-9]{7,8}$", num):
+        return True, False
     return False, False
 
 
