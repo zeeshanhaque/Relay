@@ -151,12 +151,18 @@ def validate_incident(num: str) -> tuple[bool, bool]:
 
 
 def sort_progress_entries(entries: list[dict]) -> list[dict]:
-    """Sort progress entries in descending order by datetime."""
+    """Sort progress entries in descending order by datetime, 
+    preserving reverse insertion order for equal timestamps."""
     try:
-        return sorted(
-            entries,
-            key=lambda e: datetime.strptime(e["datetime"], "%d/%m/%Y %H:%M"),
+        # Enumerate to preserve original index for stable reverse sort
+        indexed = list(enumerate(entries))
+        indexed.sort(
+            key=lambda x: (
+                datetime.strptime(x[1]["datetime"], "%d/%m/%Y %H:%M"),
+                x[0]  # original index as tiebreaker
+            ),
             reverse=True
         )
+        return [entry for _, entry in indexed]
     except (ValueError, KeyError):
         return entries

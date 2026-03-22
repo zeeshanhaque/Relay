@@ -3,7 +3,7 @@
     "selected_services": [
       "MR V"
     ],
-    "service_status": "Available",
+    "service_status": "Degraded",
     "selected_users": [
       "APAC"
     ],
@@ -14,12 +14,28 @@
       }
     ],
     "start_time": "2026-03-22T16:00:00",
-    "end_time": "2026-03-22T17:00:00",
-    "next_update": "",
+    "end_time": "",
+    "next_update": "2026-03-22T20:00:00",
     "description": "DSC",
     "impact": "IMP"
   },
   "progress_entries": [
+    {
+      "datetime": "22/03/2026 19:00",
+      "text": "s1"
+    },
+    {
+      "datetime": "22/03/2026 19:00",
+      "text": "s2"
+    },
+    {
+      "datetime": "22/03/2026 18:00",
+      "text": "wrarara"
+    },
+    {
+      "datetime": "22/03/2026 16:15",
+      "text": "done"
+    },
     {
       "datetime": "22/03/2026 16:00",
       "text": "Solved"
@@ -34,7 +50,7 @@
     },
     {
       "datetime": "22/03/2026 10:30",
-      "text": "wip4"
+      "text": "wip420"
     },
     {
       "datetime": "22/03/2026 10:30",
@@ -49,12 +65,8 @@
       "text": "WIP"
     },
     {
-      "datetime": "22/03/2026 16:15",
-      "text": "done"
-    },
-    {
-      "datetime": "22/03/2026 16:15",
-      "text": "no"
+      "datetime": "22/03/2026 19:00",
+      "text": "again"
     }
   ]
 }
