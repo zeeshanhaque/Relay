@@ -103,7 +103,7 @@ Clicking **Open in Outlook** will:
 2. Create a new mail item with:
    - **To:** hardcoded recipient (`TO_RECIPIENT` in `data_manager.py`)
    - **Bcc:** all emails for the selected regions (from `EMAIL_LISTS` in `data_manager.py`)
-   - **Subject:** `[{Status}] FOREX Incident Management Notification : {Services}`
+   - **Subject:** `[{Status}] {DEPARTMENT_NAME} Incident Management Notification : {Services}`
    - **HTMLBody:** the full formatted incident table with company logo
 3. Display the draft (`.Display(False)`) — you review and send manually
 

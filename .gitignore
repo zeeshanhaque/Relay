@@ -50,3 +50,9 @@ data/
 
 # pywin32 COM cache
 win32com/gen_py/
+
+
+# PyInstaller
+dist/
+build/
+*.spec

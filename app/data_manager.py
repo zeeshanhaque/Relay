@@ -2,43 +2,24 @@
 Data Manager - Handles JSON persistence for the Incident Management System.
 All saved data lives in data/incidents_data.json
 """
+import sys
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from .config import TO_RECIPIENT, EMAIL_LISTS, SERVICES, USERS, SERVICE_STATUSES
 
-DATA_DIR = Path(__file__).parent.parent / "data"
+
+def _get_data_dir() -> Path:
+    if getattr(sys, 'frozen', False):
+        # Running as PyInstaller bundle
+        return Path(sys.executable).parent / "data"
+    else:
+        # Running as normal Python script
+        return Path(__file__).parent.parent / "data"
+
+DATA_DIR = _get_data_dir()
 DATA_FILE = DATA_DIR / "incidents_data.json"
-
-TO_RECIPIENT = "zeeshan@gmail.com"
-
-EMAIL_LISTS = {
-    "APAC": [
-        "chen.yun@gmail.com",
-        "akira.tanaka@apacmail.com",
-        "priya.sharma@apacmail.com",
-        "min.ji.kim@apacmail.com",
-        "ali.hassan@emeamail.com",
-    ],
-    "EMEA": [
-        "sophie.dubois@emeamail.com",
-        "ali.hassan@emeamail.com",
-        "tom.schmidt@emeamail.com",
-        "lucas.nielsen@emeamail.com",
-        "anastasia.popov@emeamail.com",
-    ],
-    "AMERICAS": [
-        "michael.smith@americasmail.com",
-        "carla.martinez@americasmail.com",
-        "kevin.johnson@americasmail.com",
-        "daniela.gomez@americasmail.com",
-        "thiago.silva@americasmail.com",
-    ],
-}
-
-SERVICES = ["BD", "MR V", "MR L", "RN", "RN SN", "DGT", "SAM", "CRT", "RXL"]
-USERS = ["GLOBAL", "APAC", "EMEA", "AMERICAS"]
-SERVICE_STATUSES = ["Degraded", "Unavailable", "Under Observation", "Available"]
 
 
 def _default_data() -> dict:

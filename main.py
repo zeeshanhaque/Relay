@@ -9,11 +9,13 @@ from PySide6.QtGui import QIcon, QFont
 
 from app.main_window import MainWindow
 
+from app.config import DEPARTMENT_NAME
+
 
 def main():
     app = QApplication(sys.argv)
     app.setApplicationName("Incident Management System")
-    app.setOrganizationName("FOREX Service Desk")
+    app.setOrganizationName(f"{DEPARTMENT_NAME} Service Desk")
 
     # Set global font
     font = QFont("Segoe UI", 10)

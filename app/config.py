@@ -2,6 +2,8 @@
 Configuration - static constants for the application.
 """
 
+DEPARTMENT_NAME = "FOREX"
+
 TO_RECIPIENT = "zeeshan@gmail.com"
 
 EMAIL_LISTS = {

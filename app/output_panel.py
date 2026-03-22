@@ -2,7 +2,9 @@
 Output Panel - displays generated email notification with copy buttons
 and the Outlook integration button.
 """
-
+import sys
+import os
+from pathlib import Path
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QFrame, QScrollArea, QTableWidget, QTableWidgetItem,
@@ -12,11 +14,20 @@ from PySide6.QtCore import QSize, QTimer, Qt, QMimeData
 from PySide6.QtGui import QFont, QColor, QIcon, QPixmap
 
 from .widgets import SectionTitle, SectionCard, CopyField
-from .config import TO_RECIPIENT
+from .config import TO_RECIPIENT, DEPARTMENT_NAME
 from .data_manager import (
     get_recipients, format_list, format_datetime_display, load_data,
     sort_progress_entries
 )
+
+def _get_logo_path() -> str:
+    if getattr(sys, 'frozen', False):
+        # Running as PyInstaller bundle
+        base = Path(sys.executable).parent
+    else:
+        # Running as normal script
+        base = Path(__file__).parent.parent
+    return str(base / "resources" / "assets" / "BNPP_logo.jpg")
 
 
 class OutputPanel(QWidget):
@@ -124,7 +135,7 @@ class OutputPanel(QWidget):
         to_addr = TO_RECIPIENT
         bcc_emails = get_recipients(users)
         bcc_str = "; ".join(bcc_emails)
-        subject = f"[{status}] FOREX Incident Management Notification : {services_str}"
+        subject = f"[{status}] {DEPARTMENT_NAME} Incident Management Notification : {services_str}"
 
         self.to_field.set_text(to_addr)
         self.bcc_field.set_text(bcc_str)
@@ -206,9 +217,9 @@ class OutputPanel(QWidget):
         to_addr = TO_RECIPIENT
         bcc_emails = get_recipients(users)
         bcc_str = "; ".join(bcc_emails)
-        subject = f"[{status}] FOREX Incident Management Notification : {services}"
+        subject = f"[{status}] {DEPARTMENT_NAME} Incident Management Notification : {services}"
 
-        progress_entries = data.get("progress_entries", [])
+        progress_entries = sort_progress_entries(data.get("progress_entries", []))
 
         html_body = build_email_html(
             services=services,
@@ -294,7 +305,7 @@ class OutputPanel(QWidget):
         start_str = format_datetime_display(payload.get("start_time", ""))
         end_str = format_datetime_display(payload.get("end_time", ""))
         next_str = format_datetime_display(payload.get("next_update", ""))
-        progress_entries = data.get("progress_entries", [])
+        progress_entries = sort_progress_entries(data.get("progress_entries", []))
 
         html = build_email_html(
             services=services,
@@ -440,7 +451,7 @@ class NotificationTable(QWidget):
         rows_data = []
 
         # Title row
-        rows_data.append(("title", "FOREX Service Desk Incident Notification"))
+        rows_data.append(("title", f"{DEPARTMENT_NAME} Service Desk Incident Notification"))
 
         # Details rows
         status_bg, status_fg = self.STATUS_COLORS.get(status, ("#aaa", "#fff"))
@@ -487,8 +498,7 @@ class NotificationTable(QWidget):
 
             if kind == "title":
                 # Logo cell (left half)
-                import base64, os
-                logo_path = os.path.join(os.path.dirname(__file__), "..", "resources", "assets", "BNPP_logo.jpg")
+                logo_path = _get_logo_path()
                 if os.path.exists(logo_path):
                     logo_lbl = QLabel()
                     pixmap = QPixmap(logo_path)
@@ -629,7 +639,7 @@ def build_email_html(services, users, status, incidents_str, start_time,
 
     import base64, os
     logo_b64 = ""
-    logo_path = os.path.join(os.path.dirname(__file__), "..", "resources", "assets", "BNPP_logo.jpg")
+    logo_path = _get_logo_path()
     if os.path.exists(logo_path):
         with open(logo_path, "rb") as f:
             logo_b64 = base64.b64encode(f.read()).decode()
@@ -687,7 +697,7 @@ def build_email_html(services, users, status, incidents_str, start_time,
     <td colspan="2" style="text-align:center; vertical-align:middle; border:1px solid #000;">
       {logo_html}
     </td>
-    <td colspan="2" class="title">FOREX Service Desk Incident Notification</td>
+    <td colspan="2" class="title">{DEPARTMENT_NAME} Service Desk Incident Notification</td>
   </tr>
   <tr>
     <td class="q">Service/Application(s) Impacted</td>
