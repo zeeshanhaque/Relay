@@ -92,7 +92,13 @@ class FormPanel(QWidget):
             }
             QComboBox::drop-down {
                 border: none;
-                width: 24px;
+                width: 32px;
+            }
+            QDateTimeEdit::down-arrow, QComboBox::down-arrow {
+                image: url(:/icons/chevron_down.png);
+                width: 12px;
+                height: 12px;
+                margin-right: 8px;
             }
             QComboBox QAbstractItemView {
                 background-color: white;

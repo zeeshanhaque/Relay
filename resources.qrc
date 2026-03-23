@@ -1,6 +1,7 @@
 <!DOCTYPE RCC>
 <RCC version="1.0">
     <qresource prefix="/icons">
+        <file alias="relay_icon.png">resources/icons/relay_icon.png</file>
         <file alias="home.png">resources/icons/home.png</file>
         <file alias="settings.png">resources/icons/settings.png</file>
         <file alias="trash.png">resources/icons/trash.png</file>

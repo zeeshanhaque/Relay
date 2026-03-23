@@ -1,13 +1,16 @@
 """
 Main Window - orchestrates all panels.
 """
+import sys
+from pathlib import Path
+
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QFrame, QSplitter, QStackedWidget,
     QMessageBox, QApplication
 )
 from PySide6.QtCore import Qt, QSize, QTimer
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QIcon, QPixmap
 
 from .styles import MAIN_STYLE
 from .form_panel import FormPanel
@@ -16,10 +19,19 @@ from .settings_page import SettingsPage
 from .data_manager import clear_data, load_data
 
 
+def _get_logo_path() -> str:
+    if getattr(sys, 'frozen', False):
+        base = Path(sys.executable).parent
+    else:
+        base = Path(__file__).parent.parent
+    return str(base / "resources" / "assets" / "BNPP_logo.jpg")
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Relay - Incident Communication")
+        self.setWindowIcon(QIcon(":/icons/relay_icon.png"))
         self.setMinimumSize(1200, 720)
         self.resize(1400, 820)
         self.setStyleSheet(MAIN_STYLE)
@@ -124,15 +136,12 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(20, 12, 20, 12)
 
         # Logo
-        logo = QLabel("R")
+        logo = QLabel()
         logo.setFixedSize(44, 44)
         logo.setAlignment(Qt.AlignCenter)
-        logo.setStyleSheet(
-            "background: qlineargradient(x1:0,y1:0,x2:1,y2:1,"
-            "stop:0 #00915A,stop:1 #007047);"
-            "color: white; font-weight: 800; font-size: 16px;"
-            "border-radius: 10px;"
-        )
+        pixmap = QPixmap(":/icons/relay_icon.png")
+        if not pixmap.isNull():
+            logo.setPixmap(pixmap.scaled(44, 44, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         layout.addWidget(logo)
 
         title = QLabel("Relay - Incident Communication")
