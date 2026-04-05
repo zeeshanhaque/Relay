@@ -280,7 +280,7 @@ QTableWidget {
     border-radius: 8px;
     background: white;
 }
-QTableWidget::item { padding: 6px; }
+QTableWidget::item { padding: 4px; }
 QTableWidget::item:selected {
     background: #e8f5f0;
     color: #00915A;

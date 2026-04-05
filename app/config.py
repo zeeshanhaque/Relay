@@ -7,6 +7,10 @@ DEPARTMENT_NAME = "FOREX"
 TO_RECIPIENT = "zeeshan@gmail.com"
 
 EMAIL_LISTS = {
+    "LEADS": [
+        "lead1@company.com",
+        "lead2@company.com"
+    ],
     "APAC": [
         "chen.yun@gmail.com",
         "akira.tanaka@apacmail.com",
@@ -30,7 +34,7 @@ EMAIL_LISTS = {
     ],
 }
 
-SERVICES = ["BD", "MR V", "MR L", "RN", "RN SN", "DGT", "SAM", "CRT", "RXL"]
+SERVICES = ["BD", "DL", "MR V", "MR L", "RN", "RN SN", "DXT", "SRM", "CRZ", "RXT"]
 
 USERS = ["GLOBAL", "APAC", "EMEA", "AMERICAS"]
 

@@ -1,14 +1,25 @@
 """
-Output Panel - displays generated email notification with copy buttons
+Output Panel - displays generated email notification with copy button
 and the Outlook integration button.
 """
+
 import sys
 import os
 from pathlib import Path
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QFrame, QScrollArea, QTableWidget, QTableWidgetItem,
-    QHeaderView, QSizePolicy, QMessageBox, QApplication
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QFrame,
+    QScrollArea,
+    QTableWidget,
+    QTableWidgetItem,
+    QHeaderView,
+    QSizePolicy,
+    QMessageBox,
+    QApplication,
 )
 from PySide6.QtCore import QSize, QTimer, Qt, QMimeData
 from PySide6.QtGui import QFont, QColor, QIcon, QPixmap
@@ -16,12 +27,16 @@ from PySide6.QtGui import QFont, QColor, QIcon, QPixmap
 from .widgets import SectionTitle, SectionCard, CopyField
 from .config import TO_RECIPIENT, DEPARTMENT_NAME
 from .data_manager import (
-    get_recipients, format_list, format_datetime_display, load_data,
-    sort_progress_entries
+    get_recipients,
+    format_list,
+    format_datetime_display,
+    load_data,
+    sort_progress_entries,
 )
 
+
 def _get_logo_path() -> str:
-    if getattr(sys, 'frozen', False):
+    if getattr(sys, "frozen", False):
         # Running as PyInstaller bundle
         base = Path(sys.executable).parent
     else:
@@ -60,13 +75,13 @@ class OutputPanel(QWidget):
         card_layout.addWidget(SectionTitle("Generated Notification"))
 
         # Email header fields
-        self.to_field = CopyField("To")
+        self.to_field = CopyField("To", label_width=60, boxed=True)
         card_layout.addWidget(self.to_field)
 
-        self.bcc_field = CopyField("Bcc")
+        self.bcc_field = CopyField("Bcc", label_width=60, boxed=True)
         card_layout.addWidget(self.bcc_field)
 
-        self.subject_field = CopyField("Subject")
+        self.subject_field = CopyField("Subject", label_width=60, boxed=False)
         card_layout.addWidget(self.subject_field)
 
         # Separator
@@ -97,8 +112,8 @@ class OutputPanel(QWidget):
         self._outlook_btn.setMinimumHeight(40)
         self._outlook_btn.clicked.connect(self._open_outlook)
 
-        btn_row.addWidget(self._copy_table_btn)
-        btn_row.addWidget(self._outlook_btn)
+        btn_row.addWidget(self._copy_table_btn, 1)
+        btn_row.addWidget(self._outlook_btn, 3)
         card_layout.addLayout(btn_row)
 
         # Initially hide action buttons
@@ -165,7 +180,6 @@ class OutputPanel(QWidget):
         self._copy_table_btn.show()
         self._outlook_btn.show()
 
-    
     def clear(self):
         self.to_field.set_text("")
         self.bcc_field.set_text("")
@@ -186,10 +200,11 @@ class OutputPanel(QWidget):
             import win32com.client
         except ImportError:
             QMessageBox.information(
-                self, "pywin32 Not Found",
+                self,
+                "pywin32 Not Found",
                 "pywin32 is not installed or not available.\n\n"
                 "Install it with:  pip install pywin32\n\n"
-                "This feature is only available on Windows with Microsoft Outlook installed."
+                "This feature is only available on Windows with Microsoft Outlook installed.",
             )
             return
 
@@ -248,7 +263,7 @@ class OutputPanel(QWidget):
             # Use Recipients.Add with Type=1 (olTo) for reliable delivery
             if to_addr:
                 recip = mail.Recipients.Add(to_addr)
-                recip.Type = 1          # olTo = 1
+                recip.Type = 1  # olTo = 1
 
             # ── BCC ───────────────────────────────────────────────────────────
             # mail.BCC = "string" is unreliable across Outlook versions.
@@ -258,7 +273,7 @@ class OutputPanel(QWidget):
                 email = email.strip()
                 if email:
                     recip = mail.Recipients.Add(email)
-                    recip.Type = 3      # olBCC = 3
+                    recip.Type = 3  # olBCC = 3
 
             # Resolve all recipients (validates addresses)
             mail.Recipients.ResolveAll()
@@ -277,8 +292,11 @@ class OutputPanel(QWidget):
             mail.Display(False)
 
         except Exception as e:
-            QMessageBox.critical(self, "Outlook Error",
-                                 f"Outlook opened but failed to create the email draft:\n{e}")
+            QMessageBox.critical(
+                self,
+                "Outlook Error",
+                f"Outlook opened but failed to create the email draft:\n{e}",
+            )
 
     # ── Copy table as HTML ────────────────────────────────────────────────────
 
@@ -332,6 +350,7 @@ class OutputPanel(QWidget):
 
 # ── Outlook helpers ───────────────────────────────────────────────────────────
 
+
 def _get_outlook_instance(win32com):
     """
     Try every known strategy to get an Outlook COM Application object.
@@ -361,8 +380,8 @@ def _get_outlook_instance(win32com):
     # 3. Versioned ProgIDs  (Outlook 16.0 = 2016 / 2019 / 2021 / 365)
     for progid in (
         "Outlook.Application.16",
-        "Outlook.Application.15",   # 2013
-        "Outlook.Application.14",   # 2010
+        "Outlook.Application.15",  # 2013
+        "Outlook.Application.14",  # 2010
     ):
         try:
             return win32com.client.Dispatch(progid)
@@ -401,7 +420,7 @@ def _open_mailto_fallback(to_addr: str, subject: str, parent):
         "Falling back to your default mail client (Subject and To will be pre-filled;\n"
         "the HTML table body cannot be passed via mailto).\n\n"
         "Tip: use the 'Copy Table' button to copy the formatted table, then\n"
-        "paste it into the email body after it opens."
+        "paste it into the email body after it opens.",
     )
 
     params = urllib.parse.urlencode({"subject": subject}, quote_via=urllib.parse.quote)
@@ -410,6 +429,7 @@ def _open_mailto_fallback(to_addr: str, subject: str, parent):
     try:
         if sys.platform == "win32":
             import os
+
             os.startfile(mailto)
         else:
             subprocess.Popen(["xdg-open", mailto])
@@ -419,14 +439,15 @@ def _open_mailto_fallback(to_addr: str, subject: str, parent):
 
 # ── Notification table widget ─────────────────────────────────────────────────
 
+
 class NotificationTable(QWidget):
     """Renders the incident notification in a structured QTableWidget."""
 
     STATUS_COLORS = {
-        "Available":        ("#6fc040", "#ffffff"),
-        "Unavailable":      ("#e74c3c", "#ffffff"),
-        "Degraded":         ("#ffd500", "#000000"),
-        "Under Observation":("#0070d2", "#ffffff"),
+        "Available": ("#6fc040", "#ffffff"),
+        "Unavailable": ("#e74c3c", "#ffffff"),
+        "Degraded": ("#ffd500", "#000000"),
+        "Under Observation": ("#0070d2", "#ffffff"),
     }
 
     def __init__(self, parent=None):
@@ -444,30 +465,57 @@ class NotificationTable(QWidget):
         self._table.setSelectionMode(QTableWidget.NoSelection)
         layout.addWidget(self._table)
 
-    def populate(self, services, users, status, incidents_str,
-                 start_time, end_time, next_update, description, impact,
-                 progress_entries: list[dict]):
+    def populate(
+        self,
+        services,
+        users,
+        status,
+        incidents_str,
+        start_time,
+        end_time,
+        next_update,
+        description,
+        impact,
+        progress_entries: list[dict],
+    ):
 
         rows_data = []
 
         # Title row
-        rows_data.append(("title", f"{DEPARTMENT_NAME} Service Desk Incident Notification"))
+        rows_data.append(
+            ("title", f"{DEPARTMENT_NAME} Service Desk Incident Notification")
+        )
 
         # Details rows
         status_bg, status_fg = self.STATUS_COLORS.get(status, ("#aaa", "#fff"))
-        rows_data.append(("detail", [
-            ("Service/Application(s) Impacted", services),
-            ("Service Status", status, status_bg, status_fg),
-        ]))
-        rows_data.append(("detail_rowspan", [
-            ("Users Impacted", users),
-            ("Time Started [LT]", start_time),
-            ("Time Ended [LT]", end_time),
-        ]))
-        rows_data.append(("detail", [
-            ("Incident #", incidents_str),
-            ("Next Update At [LT]", next_update),
-        ]))
+        rows_data.append(
+            (
+                "detail",
+                [
+                    ("Service/Application(s) Impacted", services),
+                    ("Service Status", status, status_bg, status_fg),
+                ],
+            )
+        )
+        rows_data.append(
+            (
+                "detail_rowspan",
+                [
+                    ("Users Impacted", users),
+                    ("Time Started [LT]", start_time),
+                    ("Time Ended [LT]", end_time),
+                ],
+            )
+        )
+        rows_data.append(
+            (
+                "detail",
+                [
+                    ("Incident #", incidents_str),
+                    ("Next Update At [LT]", next_update),
+                ],
+            )
+        )
         rows_data.append(("wide", "Description", description))
         rows_data.append(("wide", "Impact", impact))
 
@@ -476,6 +524,8 @@ class NotificationTable(QWidget):
             rows_data.append(("progress_col_header",))
             for entry in progress_entries:
                 rows_data.append(("progress_row", entry["datetime"], entry["text"]))
+
+        rows_data.append(("footer",))
 
         # Count total rows needed
         total_rows = 0
@@ -486,6 +536,7 @@ class NotificationTable(QWidget):
                 total_rows += 1
 
         self._table.clearContents()
+        self._table.clearSpans()
         self._table.setRowCount(total_rows)
 
         r = 0
@@ -502,11 +553,13 @@ class NotificationTable(QWidget):
                 if os.path.exists(logo_path):
                     logo_lbl = QLabel()
                     pixmap = QPixmap(logo_path)
-                    logo_lbl.setPixmap(pixmap.scaledToHeight(40, Qt.SmoothTransformation))
+                    logo_lbl.setPixmap(
+                        pixmap.scaledToHeight(40, Qt.SmoothTransformation)
+                    )
                     logo_lbl.setAlignment(Qt.AlignCenter)
                     self._table.setCellWidget(r, 0, logo_lbl)
                     self._table.setSpan(r, 0, 1, 2)
-                
+
                 # Title cell (right half)
                 item = QTableWidgetItem(row[1])
                 item.setTextAlignment(Qt.AlignCenter)
@@ -544,7 +597,8 @@ class NotificationTable(QWidget):
                 pairs = row[1]
                 # users: col 0-1, spans 2 rows
                 lbl_u = QTableWidgetItem(pairs[0][0])
-                lbl_u.setBackground(GREEN); lbl_u.setForeground(GREEN_TEXT)
+                lbl_u.setBackground(GREEN)
+                lbl_u.setForeground(GREEN_TEXT)
                 lbl_u.setFont(self._bold_font())
                 self._table.setItem(r, 0, lbl_u)
                 val_u = QTableWidgetItem(pairs[0][1])
@@ -554,7 +608,8 @@ class NotificationTable(QWidget):
 
                 # Time Started
                 lbl_s = QTableWidgetItem(pairs[1][0])
-                lbl_s.setBackground(GREEN); lbl_s.setForeground(GREEN_TEXT)
+                lbl_s.setBackground(GREEN)
+                lbl_s.setForeground(GREEN_TEXT)
                 lbl_s.setFont(self._bold_font())
                 self._table.setItem(r, 2, lbl_s)
                 val_s = QTableWidgetItem(pairs[1][1])
@@ -564,7 +619,8 @@ class NotificationTable(QWidget):
 
                 # Time Ended
                 lbl_e = QTableWidgetItem(pairs[2][0])
-                lbl_e.setBackground(GREEN); lbl_e.setForeground(GREEN_TEXT)
+                lbl_e.setBackground(GREEN)
+                lbl_e.setForeground(GREEN_TEXT)
                 lbl_e.setFont(self._bold_font())
                 self._table.setItem(r, 2, lbl_e)
                 val_e = QTableWidgetItem(pairs[2][1])
@@ -574,7 +630,8 @@ class NotificationTable(QWidget):
 
             elif kind == "wide":
                 lbl_item = QTableWidgetItem(row[1])
-                lbl_item.setBackground(GREEN); lbl_item.setForeground(GREEN_TEXT)
+                lbl_item.setBackground(GREEN)
+                lbl_item.setForeground(GREEN_TEXT)
                 lbl_item.setFont(self._bold_font())
                 self._table.setItem(r, 0, lbl_item)
 
@@ -622,9 +679,25 @@ class NotificationTable(QWidget):
                 self._table.setRowHeight(r, 36)
                 r += 1
 
+            elif kind == "footer":
+                footer_item = QTableWidgetItem(
+                    f'For any further queries, please contact: {DEPARTMENT_NAME} Service Desk - {TO_RECIPIENT}'
+                )
+                footer_item.setTextAlignment(Qt.AlignCenter)
+                footer_item.setBackground(QColor("#00915A"))
+                footer_item.setForeground(QColor("white"))
+                f = QFont()
+                f.setPointSize(10)
+                f.setBold(True)
+                footer_item.setFont(f)
+                self._table.setItem(r, 0, footer_item)
+                self._table.setSpan(r, 0, 1, 4)
+                self._table.setRowHeight(r, 28)
+                r += 1
+
         self._table.resizeRowsToContents()
 
-    def _bold_font(self, size: int = 11) -> QFont:
+    def _bold_font(self, size: int = 10) -> QFont:
         f = QFont()
         f.setBold(True)
         f.setPointSize(size)
@@ -633,28 +706,39 @@ class NotificationTable(QWidget):
 
 # ── HTML email builder ─────────────────────────────────────────────────────────
 
-def build_email_html(services, users, status, incidents_str, start_time,
-                     end_time, next_update, description, impact,
-                     progress_entries: list[dict]) -> str:
+
+def build_email_html(
+    services,
+    users,
+    status,
+    incidents_str,
+    start_time,
+    end_time,
+    next_update,
+    description,
+    impact,
+    progress_entries: list[dict],
+) -> str:
 
     import base64, os
+
     logo_b64 = ""
     logo_path = _get_logo_path()
     if os.path.exists(logo_path):
         with open(logo_path, "rb") as f:
             logo_b64 = base64.b64encode(f.read()).decode()
-    
+
     logo_html = (
         f'<img src="data:image/jpeg;base64,{logo_b64}" alt="Logo" style="max-width:150px; width:auto; height:auto;"/>'
-        if logo_b64 else ""
+        if logo_b64
+        else ""
     )
 
-
     status_styles = {
-        "Available":        "background:#6fc040;color:white;",
-        "Unavailable":      "background:#e74c3c;color:white;",
-        "Degraded":         "background:#ffd500;color:black;",
-        "Under Observation":"background:#0070d2;color:white;",
+        "Available": "background:#6fc040;color:white;",
+        "Unavailable": "background:#e74c3c;color:white;",
+        "Degraded": "background:#ffd500;color:black;",
+        "Under Observation": "background:#0070d2;color:white;",
     }
     status_style = status_styles.get(status, "background:#aaa;color:white;")
 
@@ -730,6 +814,12 @@ def build_email_html(services, users, status, incidents_str, start_time,
     <td colspan="3" class="a">{impact}</td>
   </tr>
   {progress_rows}
+  <tr>
+    <td colspan="4" style="background:#00915A;color:white;font-weight:bold;
+        text-align:center;border:1px solid #000;padding:0px;height:28px;">
+      For any further queries, please contact: {DEPARTMENT_NAME} Service Desk - <u>{TO_RECIPIENT}</u>
+    </td>
+  </tr>
 </table>
 </body>
 </html>

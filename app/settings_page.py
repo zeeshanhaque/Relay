@@ -242,7 +242,7 @@ class SettingsPage(QWidget):
                         "datetime": dt_str,
                         "text": txt_item.text().strip()
                     })
-            data["progress_entries"] = sort_progress_entries(entries)
+            data["progress_entries"] = entries
 
         save_data(data)
         self._raw_editor.setPlainText(json.dumps(data, indent=2, ensure_ascii=False))

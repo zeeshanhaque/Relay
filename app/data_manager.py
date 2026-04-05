@@ -69,14 +69,21 @@ def clear_data() -> dict:
 
 
 def get_recipients(selected_users: list[str]) -> list[str]:
-    """Return deduplicated flat list of email recipients based on selected user regions."""
+    """Return deduplicated flat list of email recipients based on selected user regions.
+    LEADS are always included regardless of selected regions."""
     all_recipients = []
+    
     if "GLOBAL" in selected_users:
         for region in ["APAC", "EMEA", "AMERICAS"]:
             all_recipients.extend(EMAIL_LISTS.get(region, []))
     else:
         for region in selected_users:
             all_recipients.extend(EMAIL_LISTS.get(region, []))
+    
+    # Always add LEADS
+    all_recipients.extend(EMAIL_LISTS.get("LEADS", []))
+    
+    # Deduplicate preserving order
     seen = set()
     result = []
     for email in all_recipients:

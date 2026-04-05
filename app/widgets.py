@@ -2,10 +2,10 @@
 Custom reusable widgets for the Incident Management System.
 """
 from PySide6.QtWidgets import (
-    QApplication, QToolTip, QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton,
+    QWidget, QHBoxLayout, QVBoxLayout, QLabel, QPushButton,
     QCheckBox, QFrame, QScrollArea, QSizePolicy, QDateTimeEdit
 )
-from PySide6.QtCore import QDateTime, QTimer, Qt, Signal, QSize
+from PySide6.QtCore import QDateTime, Qt, Signal, QSize
 from PySide6.QtGui import QFont, QIcon
 
 from datetime import datetime, timedelta
@@ -131,6 +131,47 @@ class SectionTitle(QLabel):
         )
 
 
+def make_hover(row, checkbox):
+    def enter(e):
+        checkbox.setStyleSheet("""
+            QCheckBox {
+                padding: 4px;
+                font-size: 13px;
+                background: transparent;
+            }
+            QCheckBox::indicator {
+                width: 18px;
+                height: 18px;
+                border-radius: 4px;
+                border: 2px solid #00915A;
+            }
+            QCheckBox::indicator:checked {
+                background-color: #00915A;
+                border-color: #00915A;
+            }
+        """)
+    def leave(e):
+        checkbox.setStyleSheet("""
+            QCheckBox {
+                padding: 4px;
+                font-size: 13px;
+                background: transparent;
+            }
+            QCheckBox::indicator {
+                width: 18px;
+                height: 18px;
+                border-radius: 4px;
+                border: 2px solid #e0e0e0;
+            }
+            QCheckBox::indicator:checked {
+                background-color: #00915A;
+                border-color: #00915A;
+            }
+        """)
+    row.enterEvent = enter
+    row.leaveEvent = leave
+
+
 class MultiCheckDropdown(QWidget):
     """
     A custom dropdown that shows checkboxes for multi-select.
@@ -190,16 +231,58 @@ class MultiCheckDropdown(QWidget):
         self._panel.setWindowFlags(Qt.Popup)
         panel_layout = QVBoxLayout(self._panel)
         panel_layout.setContentsMargins(8, 8, 8, 8)
-        panel_layout.setSpacing(4)
+        panel_layout.setSpacing(2)
 
         for option in self._options:
+            row_widget = QWidget()
+            row_widget.setCursor(Qt.PointingHandCursor)
+            row_widget.setStyleSheet("""
+                QWidget {
+                    border-radius: 4px;
+                    background: transparent;
+                }
+                QWidget:hover {
+                    background: #e8f5f0;
+                }
+                QWidget:hover QCheckBox::indicator {
+                    border-color: #00915A;
+                }
+            """)
+            row_layout = QHBoxLayout(row_widget)
+            row_layout.setContentsMargins(4, 2, 4, 2)
+            row_layout.setSpacing(8)
+
             cb = QCheckBox(option)
-            cb.setStyleSheet("padding: 6px 4px; font-size: 13px;")
+            cb.setStyleSheet("""
+                QCheckBox {
+                    padding: 4px;
+                    font-size: 13px;
+                    background: transparent;
+                }
+                QCheckBox::indicator {
+                    width: 18px;
+                    height: 18px;
+                    border-radius: 4px;
+                    border: 2px solid #e0e0e0;
+                }
+                QCheckBox::indicator:checked {
+                    background-color: #00915A;
+                    border-color: #00915A;
+                }
+            """)
+            cb.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
             cb.stateChanged.connect(self._on_change)
-            panel_layout.addWidget(cb)
+            row_layout.addWidget(cb)
+
+            # Click anywhere on row toggles checkbox
+            row_widget.mousePressEvent = lambda e, c=cb: c.setChecked(not c.isChecked())
+
+            panel_layout.addWidget(row_widget)
             self._checkboxes[option] = cb
+            make_hover(row_widget, cb)
 
         self._panel.hide()
+
 
     def _toggle_popup(self):
         if self._panel.isVisible():
@@ -330,7 +413,7 @@ class StatusBadge(QLabel):
 
 class CopyField(QWidget):
     """A labelled read-only text line with a copy button."""
-    def __init__(self, label: str, parent=None):
+    def __init__(self, label: str, parent=None, label_width: int = 40, boxed: bool = True):
         super().__init__(parent)
         self.setFixedHeight(36)
         layout = QHBoxLayout(self)
@@ -338,11 +421,18 @@ class CopyField(QWidget):
         layout.setSpacing(8)
 
         lbl = QLabel(label)
-        lbl.setFixedWidth(40)
-        lbl.setStyleSheet(
-            "color: #7f8c8d; border: 1px solid #bbb; border-radius: 4px;"
-            " padding: 4px 6px; background: white; font-weight: 600;"
-        )
+        lbl.setFixedWidth(label_width)
+        lbl.setAlignment(Qt.AlignCenter)
+        if boxed:
+            lbl.setStyleSheet(
+                "color: #7f8c8d; border: 1px solid #bbb; border-radius: 4px;"
+                " padding: 4px 6px; background: white; font-weight: 600;"
+            )
+        else:
+            lbl.setStyleSheet(
+                "color: #7f8c8d; border: none; background: transparent;"
+                " padding: 4px 6px; font-weight: 600;"
+            )
         layout.addWidget(lbl)
 
         self._text_lbl = QLabel("")
@@ -367,22 +457,8 @@ class CopyField(QWidget):
         scroll.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         layout.addWidget(scroll)
 
-        self._copy_btn = QPushButton()
-        self._copy_btn.setObjectName("copyBtn")
-        self._copy_btn.setIcon(QIcon(":/icons/copy.png"))
-        self._copy_btn.setIconSize(QSize(16, 16))
-        self._copy_btn.setFixedWidth(40)
-        self._copy_btn.clicked.connect(self._copy)
-        layout.addWidget(self._copy_btn)
-
     def set_text(self, text: str):
         self._text_lbl.setText(text)
 
     def get_text(self) -> str:
         return self._text_lbl.text()
-
-    def _copy(self):
-        QApplication.clipboard().setText(self.get_text())
-        orig_icon = self._copy_btn.icon()
-        self._copy_btn.setIcon(QIcon(":/icons/copy_done.png"))
-        QTimer.singleShot(1500, lambda: self._copy_btn.setIcon(orig_icon))

@@ -136,7 +136,7 @@ class FormPanel(QWidget):
         self._incidents_layout = QHBoxLayout(self._incidents_container)
         self._incidents_layout.setContentsMargins(0, 0, 0, 0)
         self._incidents_layout.setSpacing(8)
-        self._incidents_layout.setAlignment(Qt.AlignLeft)
+        self._incidents_layout.setAlignment(Qt.AlignRight)
         card_layout.addWidget(self._incidents_container)
 
         # Row 3: Times
