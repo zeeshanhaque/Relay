@@ -34,7 +34,7 @@ EMAIL_LISTS = {
     ],
 }
 
-SERVICES = ["BlueRice", "Data Loading", "Makeit Rusk Val", "Makeit Rusk Lunits", "Rusk N", "RN SN", "DXT", "SRM", "CRZ", "RXT"]
+SERVICES = ["BD", "DL", "MR V", "MR L", "RN", "RN SN", "DXT", "SRM", "CRZ", "RXT"]
 
 USERS = ["GLOBAL", "APAC", "EMEA", "AMERICAS"]
 

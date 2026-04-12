@@ -47,6 +47,7 @@ resources_rc.py
 
 # App data — contains user-specific incident data, should not be shared
 data/
+data/incidents_data.json
 
 # pywin32 COM cache
 win32com/gen_py/

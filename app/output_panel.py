@@ -2,31 +2,20 @@
 Output Panel - displays generated email notification and the Outlook integration button.
 """
 
-import sys
-import os, base64
-from pathlib import Path
+import sys, os
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame,QScrollArea, QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox, QApplication
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFrame,QScrollArea, QMessageBox, QApplication
 )
 from PySide6.QtCore import QSize, QTimer, Qt, QMimeData
-from PySide6.QtGui import QFont, QColor, QIcon, QPixmap
+from PySide6.QtGui import QIcon
 
 from .widgets import SectionTitle, SectionCard, CopyField
 from .config import DEPARTMENT_DESK, DEPARTMENT_NAME
 from .data_manager import (
     get_recipients, format_list, format_services, format_datetime_display, load_data, sort_progress_entries, get_cob_date
 )
-
-
-def _get_logo_path() -> str:
-    if getattr(sys, "frozen", False):
-        # Running as PyInstaller bundle
-        base = Path(sys.executable).parent
-    else:
-        # Running as normal script
-        base = Path(__file__).parent.parent
-    return str(base / "resources" / "assets" / "BNPP_logo.jpg")
+from .email_builder import NotificationTable, build_email_html
 
 
 class OutputPanel(QWidget):
@@ -104,69 +93,68 @@ class OutputPanel(QWidget):
         self._outlook_btn.hide()
 
 
-    # ── Public API ────────────────────────────────────────────────────────────
-    def populate(self, payload: dict):
-        """Populate all output fields from the generate payload."""
-        self._current_payload = payload
-        data = load_data()
+    def _build_incident_str(self, incidents: list) -> str:
+        """Build incident display string, omitting P4 priority."""
+        parts = []
+        for inc in incidents:
+            p = inc.get("priority", "")
+            parts.append(f"{inc['number']} [{p}]" if p and p != "P4" else inc["number"])
+        return ", ".join(parts)
 
+    def _build_email_data(self, payload: dict, data: dict) -> dict:
+        """Extract and format all common fields needed for email generation."""
         services_raw = payload["services"]
         services_str = format_services(services_raw)
         users = payload["users"]
         status = payload["status"]
-        incidents = payload["incidents"]
+
+        all_regions = {"APAC", "EMEA", "AMERICAS"}
+        users_str = "GLOBAL" if set(users) >= all_regions else format_list(users)
 
         if "DL" in services_raw:
             subject = f"[{status}] {DEPARTMENT_NAME} Incident Management Notification : {services_str} for COB {get_cob_date()}"
         else:
             subject = f"[{status}] {DEPARTMENT_NAME} Incident Management Notification : {services_str}"
 
-        all_regions = {"APAC", "EMEA", "AMERICAS"}
-        if set(users) >= all_regions:
-            users_str = "GLOBAL"
-        else:
-            users_str = format_list(users)
+        return {
+            "services_raw": services_raw,
+            "services_str": services_str,
+            "users_str": users_str,
+            "status": status,
+            "subject": subject,
+            "incidents_str": self._build_incident_str(payload["incidents"]),
+            "start_str": format_datetime_display(payload.get("start_time", "")),
+            "end_str": format_datetime_display(payload.get("end_time", "")),
+            "next_str": format_datetime_display(payload.get("next_update", "")),
+            "description": payload.get("description", ""),
+            "impact": payload.get("impact", ""),
+            "progress_entries": sort_progress_entries(data.get("progress_entries", [])),
+            "bcc_emails": get_recipients(payload["users"]),
+        }
 
-        # Build incident display string
-        inc_parts = []
-        for inc in incidents:
-            p = inc.get("priority", "")
-            if p and p != "P4":
-                inc_parts.append(f"{inc['number']} [{p}]")
-            else:
-                inc_parts.append(inc["number"])
-        incidents_str = ", ".join(inc_parts)
 
-        # Recipients
-        dept_desk = DEPARTMENT_DESK
-        bcc_emails = get_recipients(users)
-        bcc_str = "; ".join(bcc_emails)
+    # ── Public API ────────────────────────────────────────────────────────────
+    def populate(self, payload: dict):
+        self._current_payload = payload
+        data = load_data()
+        d = self._build_email_data(payload, data)
 
-        self.to_field.set_text(dept_desk)
-        self.bcc_field.set_text(bcc_str)
-        self.subject_field.set_text(subject)
-
-        # Times
-        start_str = format_datetime_display(payload.get("start_time", ""))
-        end_str = format_datetime_display(payload.get("end_time", ""))
-        next_str = format_datetime_display(payload.get("next_update", ""))
-
-        # Progress entries from storage
-        progress_entries = sort_progress_entries(data.get("progress_entries", []))
+        self.to_field.set_text(DEPARTMENT_DESK)
+        self.bcc_field.set_text("; ".join(d["bcc_emails"]))
+        self.subject_field.set_text(d["subject"])
 
         self._table_widget.populate(
-            services=services_str,
-            users=users_str,
-            status=status,
-            incidents_str=incidents_str,
-            start_time=start_str,
-            end_time=end_str,
-            next_update=next_str,
-            description=payload.get("description", ""),
-            impact=payload.get("impact", ""),
-            progress_entries=progress_entries,
+            services=d["services_str"],
+            users=d["users_str"],
+            status=d["status"],
+            incidents_str=d["incidents_str"],
+            start_time=d["start_str"],
+            end_time=d["end_str"],
+            next_update=d["next_str"],
+            description=d["description"],
+            impact=d["impact"],
+            progress_entries=d["progress_entries"],
         )
-
         self._copy_table_btn.show()
         self._outlook_btn.show()
 
@@ -186,161 +174,55 @@ class OutputPanel(QWidget):
     def _open_outlook(self):
         if not self._current_payload:
             return
-
         try:
             import win32com.client
         except ImportError:
-            QMessageBox.information(
-                self,
-                "pywin32 Not Found",
-                "pywin32 is not installed or not available.\n\n"
-                "Install it with:  pip install pywin32\n\n"
-                "This feature is only available on Windows with Microsoft Outlook installed.",
-            )
+            QMessageBox.information(self, "pywin32 Not Found", "pywin32 is not installed.\nInstall with: pip install pywin32")
             return
 
-        # Build email content first
         data = load_data()
-        payload = self._current_payload
-        services_raw = payload["services"]
-        services_str = format_services(services_raw)
-        users = payload["users"]
-        status = payload["status"]
-        incidents = payload["incidents"]
-
-        if "DL" in services_raw:
-            subject = f"[{status}] {DEPARTMENT_NAME} Incident Management Notification : {services_str} for COB {get_cob_date()}"
-        else:
-            subject = f"[{status}] {DEPARTMENT_NAME} Incident Management Notification : {services_str}"
-
-        inc_parts = []
-        for inc in incidents:
-            p = inc.get("priority", "")
-            if p and p != "P4":
-                inc_parts.append(f"{inc['number']} [{p}]")
-            else:
-                inc_parts.append(inc["number"])
-        incidents_str = ", ".join(inc_parts)
-
-        all_regions = {"APAC", "EMEA", "AMERICAS"}
-        users_str = "GLOBAL" if set(users) >= all_regions else format_list(users)
-
-        start_str = format_datetime_display(payload.get("start_time", ""))
-        end_str = format_datetime_display(payload.get("end_time", ""))
-        next_str = format_datetime_display(payload.get("next_update", ""))
-
-        dept_desk = DEPARTMENT_DESK
-        bcc_emails = get_recipients(users)
-        bcc_str = "; ".join(bcc_emails)
-
-        progress_entries = sort_progress_entries(data.get("progress_entries", []))
+        d = self._build_email_data(self._current_payload, data)
 
         html_body = build_email_html(
-            services=services_str,
-            users=users_str,
-            status=status,
-            incidents_str=incidents_str,
-            start_time=start_str,
-            end_time=end_str,
-            next_update=next_str,
-            description=payload.get("description", ""),
-            impact=payload.get("impact", ""),
-            progress_entries=progress_entries,
+            services=d["services_str"], users=d["users_str"], status=d["status"],
+            incidents_str=d["incidents_str"], start_time=d["start_str"],
+            end_time=d["end_str"], next_update=d["next_str"],
+            description=d["description"], impact=d["impact"],
+            progress_entries=d["progress_entries"],
         )
 
-        # Try to get/create an Outlook COM instance using multiple strategies
         outlook = _get_outlook_instance(win32com)
         if outlook is None:
-            # All COM strategies failed — fall back to mailto: URI
-            _open_mailto_fallback(dept_desk, subject, self)
+            _open_mailto_fallback(DEPARTMENT_DESK, d["subject"], self)
             return
 
         try:
-            mail = outlook.CreateItem(0)  # 0 = olMailItem
-
-            # ── To ────────────────────────────────────────────────────────────
-            # Use Recipients.Add with Type=1 (olTo) for reliable delivery
-            if dept_desk:
-                recip = mail.Recipients.Add(dept_desk)
-                recip.Type = 1  # olTo = 1
-
-            # ── BCC ───────────────────────────────────────────────────────────
-            # mail.BCC = "string" is unreliable across Outlook versions.
-            # Adding each address individually via Recipients.Add with
-            # Type=3 (olBCC) is the only approach that works consistently.
-            for email in bcc_emails:
-                email = email.strip()
-                if email:
-                    recip = mail.Recipients.Add(email)
-                    recip.Type = 3  # olBCC = 3
-
-            # Resolve all recipients (validates addresses)
-            mail.Recipients.ResolveAll()
-
-            # ── Subject ───────────────────────────────────────────────────────
-            mail.Subject = subject
-
-            # ── Body ──────────────────────────────────────────────────────────
-            # HTMLBody MUST be set before Display(); setting it after causes
-            # Outlook to silently discard it in newer Microsoft 365 builds.
-            # Clear Body first to prevent plain-text clobbering the HTML renderer.
+            mail = outlook.CreateItem(0)
+            if DEPARTMENT_DESK:
+                mail.To = DEPARTMENT_DESK
+            mail.BCC = "; ".join(d["bcc_emails"])
+            mail.Subject = d["subject"]
             mail.Body = ""
             mail.HTMLBody = html_body
-
-            # Display the draft — False = non-modal
             mail.Display(False)
-
         except Exception as e:
-            QMessageBox.critical(
-                self,
-                "Outlook Error",
-                f"Outlook opened but failed to create the email draft:\n{e}",
-            )
+            QMessageBox.critical(self, "Outlook Error", f"Failed to create email draft:\n{e}")
 
 
     # ── Copy table as HTML ────────────────────────────────────────────────────
     def _copy_table_html(self):
         if not self._current_payload:
             return
-
         data = load_data()
-        payload = self._current_payload
-        services_raw = payload["services"]
-        services = format_services(services_raw)
-        users = payload["users"]
-        status = payload["status"]
-        incidents = payload["incidents"]
-
-        inc_parts = []
-        for inc in incidents:
-            p = inc.get("priority", "")
-            if p and p != "P4":
-                inc_parts.append(f"{inc['number']} [{p}]")
-            else:
-                inc_parts.append(inc["number"])
-        incidents_str = ", ".join(inc_parts)
-
-        all_regions = {"APAC", "EMEA", "AMERICAS"}
-        users_str = "GLOBAL" if set(users) >= all_regions else format_list(users)
-
-        start_str = format_datetime_display(payload.get("start_time", ""))
-        end_str = format_datetime_display(payload.get("end_time", ""))
-        next_str = format_datetime_display(payload.get("next_update", ""))
-        progress_entries = sort_progress_entries(data.get("progress_entries", []))
+        d = self._build_email_data(self._current_payload, data)
 
         html = build_email_html(
-            services=services,
-            users=users_str,
-            status=status,
-            incidents_str=incidents_str,
-            start_time=start_str,
-            end_time=end_str,
-            next_update=next_str,
-            description=payload.get("description", ""),
-            impact=payload.get("impact", ""),
-            progress_entries=progress_entries,
+            services=d["services_str"], users=d["users_str"], status=d["status"],
+            incidents_str=d["incidents_str"], start_time=d["start_str"],
+            end_time=d["end_str"], next_update=d["next_str"],
+            description=d["description"], impact=d["impact"],
+            progress_entries=d["progress_entries"],
         )
-
         mime = QMimeData()
         mime.setHtml(html)
         mime.setText(html)
@@ -434,385 +316,3 @@ def _open_mailto_fallback(dept_desk: str, subject: str, parent):
             subprocess.Popen(["xdg-open", mailto])
     except Exception:
         pass  # Nothing more we can do
-
-
-# ── Notification table widget ─────────────────────────────────────────────────
-class NotificationTable(QWidget):
-    """Renders the incident notification in a structured QTableWidget."""
-    STATUS_COLORS = {
-        "Available": ("#6fc040", "#ffffff"),
-        "Unavailable": ("#e74c3c", "#ffffff"),
-        "Degraded": ("#ffd500", "#000000"),
-        "Under Observation": ("#0070d2", "#ffffff"),
-    }
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-
-        self._table = QTableWidget()
-        self._table.setColumnCount(4)
-        self._table.horizontalHeader().setVisible(False)
-        self._table.verticalHeader().setVisible(False)
-        self._table.setShowGrid(True)
-        self._table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self._table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self._table.setSelectionMode(QTableWidget.NoSelection)
-        layout.addWidget(self._table)
-
-    def populate(
-        self,
-        services,
-        users,
-        status,
-        incidents_str,
-        start_time,
-        end_time,
-        next_update,
-        description,
-        impact,
-        progress_entries: list[dict],
-    ):
-        rows_data = []
-
-        # Title row
-        rows_data.append(
-            ("title", f"{DEPARTMENT_NAME} Service Desk Incident Notification")
-        )
-
-        # Details rows
-        status_bg, status_fg = self.STATUS_COLORS.get(status, ("#aaa", "#fff"))
-        rows_data.append(
-            (
-                "detail",
-                [
-                    ("Service/Application(s) Impacted", services),
-                    ("Service Status", status, status_bg, status_fg),
-                ],
-            )
-        )
-        rows_data.append(
-            (
-                "detail_rowspan",
-                [
-                    ("Users Impacted", users),
-                    ("Time Started [LT]", start_time),
-                    ("Time Ended [LT]", end_time),
-                ],
-            )
-        )
-        rows_data.append(
-            (
-                "detail",
-                [
-                    ("Incident #", incidents_str),
-                    ("Next Update At [LT]", next_update),
-                ],
-            )
-        )
-        rows_data.append(("wide", "Description", description))
-        rows_data.append(("wide", "Impact", impact))
-
-        if progress_entries:
-            rows_data.append(("progress_header",))
-            rows_data.append(("progress_col_header",))
-            for entry in progress_entries:
-                rows_data.append(("progress_row", entry["datetime"], entry["text"]))
-
-        rows_data.append(("footer",))
-
-        # Count total rows needed
-        total_rows = 0
-        for row in rows_data:
-            if row[0] == "detail_rowspan":
-                total_rows += 2
-            else:
-                total_rows += 1
-
-        self._table.clearContents()
-        self._table.clearSpans()
-        self._table.setRowCount(total_rows)
-
-        r = 0
-        GREEN = QColor("#00915A")
-        GREEN_TEXT = QColor("white")
-        GREY = QColor("#f0f0f0")
-
-        for row in rows_data:
-            kind = row[0]
-
-            if kind == "title":
-                # Logo cell (left half)
-                logo_path = _get_logo_path()
-                if os.path.exists(logo_path):
-                    logo_lbl = QLabel()
-                    pixmap = QPixmap(logo_path)
-                    logo_lbl.setPixmap(
-                        pixmap.scaledToHeight(40, Qt.SmoothTransformation)
-                    )
-                    logo_lbl.setAlignment(Qt.AlignCenter)
-                    self._table.setCellWidget(r, 0, logo_lbl)
-                    self._table.setSpan(r, 0, 1, 2)
-
-                # Title cell (right half)
-                item = QTableWidgetItem(row[1])
-                item.setTextAlignment(Qt.AlignCenter)
-                item.setFont(self._bold_font(14))
-                item.setForeground(QColor("#00915A"))
-                self._table.setItem(r, 2, item)
-                self._table.setSpan(r, 2, 1, 2)
-                self._table.setRowHeight(r, 60)
-                r += 1
-
-            elif kind == "detail":
-                pairs = row[1]
-                # Pairs: list of (label, value) or (label, value, bg, fg)
-                col = 0
-                for pair in pairs:
-                    lbl_item = QTableWidgetItem(pair[0])
-                    lbl_item.setBackground(GREEN)
-                    lbl_item.setForeground(GREEN_TEXT)
-                    lbl_item.setFont(self._bold_font())
-                    self._table.setItem(r, col, lbl_item)
-
-                    val_item = QTableWidgetItem(pair[1])
-                    if len(pair) > 2:
-                        val_item.setBackground(QColor(pair[2]))
-                        val_item.setForeground(QColor(pair[3]))
-                        val_item.setFont(self._bold_font())
-                        val_item.setTextAlignment(Qt.AlignCenter)
-                    self._table.setItem(r, col + 1, val_item)
-                    col += 2
-                self._table.setRowHeight(r, 40)
-                r += 1
-
-            elif kind == "detail_rowspan":
-                # Row with users spanning 2 rows, and time started/ended
-                pairs = row[1]
-                # users: col 0-1, spans 2 rows
-                lbl_u = QTableWidgetItem(pairs[0][0])
-                lbl_u.setBackground(GREEN)
-                lbl_u.setForeground(GREEN_TEXT)
-                lbl_u.setFont(self._bold_font())
-                self._table.setItem(r, 0, lbl_u)
-                val_u = QTableWidgetItem(pairs[0][1])
-                self._table.setItem(r, 1, val_u)
-                self._table.setSpan(r, 0, 2, 1)
-                self._table.setSpan(r, 1, 2, 1)
-
-                # Time Started
-                lbl_s = QTableWidgetItem(pairs[1][0])
-                lbl_s.setBackground(GREEN)
-                lbl_s.setForeground(GREEN_TEXT)
-                lbl_s.setFont(self._bold_font())
-                self._table.setItem(r, 2, lbl_s)
-                val_s = QTableWidgetItem(pairs[1][1])
-                self._table.setItem(r, 3, val_s)
-                self._table.setRowHeight(r, 36)
-                r += 1
-
-                # Time Ended
-                lbl_e = QTableWidgetItem(pairs[2][0])
-                lbl_e.setBackground(GREEN)
-                lbl_e.setForeground(GREEN_TEXT)
-                lbl_e.setFont(self._bold_font())
-                self._table.setItem(r, 2, lbl_e)
-                val_e = QTableWidgetItem(pairs[2][1])
-                self._table.setItem(r, 3, val_e)
-                self._table.setRowHeight(r, 36)
-                r += 1
-
-            elif kind == "wide":
-                lbl_item = QTableWidgetItem(row[1])
-                lbl_item.setBackground(GREEN)
-                lbl_item.setForeground(GREEN_TEXT)
-                lbl_item.setFont(self._bold_font())
-                self._table.setItem(r, 0, lbl_item)
-
-                val_item = QTableWidgetItem(row[2])
-                val_item.setTextAlignment(Qt.AlignTop | Qt.AlignLeft)
-                self._table.setItem(r, 1, val_item)
-                self._table.setSpan(r, 1, 1, 3)
-                self._table.setRowHeight(r, 60)
-                r += 1
-
-            elif kind == "progress_header":
-                item = QTableWidgetItem("Progress in Chronological Order")
-                item.setBackground(GREY)
-                item.setFont(self._bold_font())
-                item.setTextAlignment(Qt.AlignCenter)
-                self._table.setItem(r, 0, item)
-                self._table.setSpan(r, 0, 1, 4)
-                self._table.setRowHeight(r, 36)
-                r += 1
-
-            elif kind == "progress_col_header":
-                dt_item = QTableWidgetItem("Date/Time [LT]")
-                dt_item.setBackground(GREY)
-                dt_item.setFont(self._bold_font())
-                dt_item.setTextAlignment(Qt.AlignCenter)
-                self._table.setItem(r, 0, dt_item)
-
-                det_item = QTableWidgetItem("Details")
-                det_item.setBackground(GREY)
-                det_item.setFont(self._bold_font())
-                det_item.setTextAlignment(Qt.AlignCenter)
-                self._table.setItem(r, 1, det_item)
-                self._table.setSpan(r, 1, 1, 3)
-                self._table.setRowHeight(r, 36)
-                r += 1
-
-            elif kind == "progress_row":
-                dt_item = QTableWidgetItem(row[1])
-                dt_item.setTextAlignment(Qt.AlignCenter)
-                self._table.setItem(r, 0, dt_item)
-
-                text_item = QTableWidgetItem(row[2])
-                self._table.setItem(r, 1, text_item)
-                self._table.setSpan(r, 1, 1, 3)
-                self._table.setRowHeight(r, 36)
-                r += 1
-
-            elif kind == "footer":
-                footer_item = QTableWidgetItem(
-                    f'For any further queries, please contact: {DEPARTMENT_NAME} Service Desk - {DEPARTMENT_DESK}'
-                )
-                footer_item.setTextAlignment(Qt.AlignCenter)
-                footer_item.setBackground(QColor("#00915A"))
-                footer_item.setForeground(QColor("white"))
-                f = QFont()
-                f.setPointSize(10)
-                f.setBold(True)
-                footer_item.setFont(f)
-                self._table.setItem(r, 0, footer_item)
-                self._table.setSpan(r, 0, 1, 4)
-                self._table.setRowHeight(r, 28)
-                r += 1
-
-        self._table.resizeRowsToContents()
-
-    def _bold_font(self, size: int = 10) -> QFont:
-        f = QFont()
-        f.setPointSize(size)
-        f.setBold(True)
-        return f
-
-
-# ── HTML email builder ─────────────────────────────────────────────────────────
-def build_email_html(
-    services,
-    users,
-    status,
-    incidents_str,
-    start_time,
-    end_time,
-    next_update,
-    description,
-    impact,
-    progress_entries: list[dict],
-) -> str:
-
-    logo_b64 = ""
-    logo_path = _get_logo_path()
-    if os.path.exists(logo_path):
-        with open(logo_path, "rb") as f:
-            logo_b64 = base64.b64encode(f.read()).decode()
-
-    logo_html = (
-        f'<img src="data:image/jpeg;base64,{logo_b64}" alt="Logo" style="max-width:150px; width:auto; height:auto;"/>'
-        if logo_b64
-        else ""
-    )
-
-    status_styles = {
-        "Available": "background:#6fc040;color:white;",
-        "Unavailable": "background:#e74c3c;color:white;",
-        "Degraded": "background:#ffd500;color:black;",
-        "Under Observation": "background:#0070d2;color:white;",
-    }
-    status_style = status_styles.get(status, "background:#aaa;color:white;")
-
-    progress_rows = ""
-    if progress_entries:
-        progress_rows = """
-        <tr>
-            <td colspan="4" style="background:#f0f0f0;font-weight:bold;text-align:center;
-                border:1px solid #000;padding:8px;">Progress in Chronological Order</td>
-        </tr>
-        <tr>
-            <td colspan="1" style="background:#f0f0f0;font-weight:bold;text-align:center;
-                border:1px solid #000;padding:8px;">Date/Time [LT]</td>
-            <td colspan="3" style="background:#f0f0f0;font-weight:bold;text-align:center;
-                border:1px solid #000;padding:8px;">Details</td>
-        </tr>
-        """
-        for entry in progress_entries:
-            progress_rows += f"""
-        <tr>
-            <td colspan="1" style="text-align:center;border:1px solid #000;padding:8px;">{entry['datetime']}</td>
-            <td colspan="3" style="border:1px solid #000;padding:8px;">{entry['text']}</td>
-        </tr>"""
-
-    html = f"""
-<html>
-<head>
-<style>
-  body {{ font-family: Arial, Helvetica, sans-serif; font-size: 13px; }}
-  table {{ border-collapse: collapse; width: 100%; }}
-  td {{ border: 1px solid #000; padding: 6px; height: 36px; }}
-  .q {{ background: #00915A; color: white; font-weight: bold; width: 25%; }}
-  .a {{ width: 25%; }}
-  .title {{ color: #00915A; font-weight: bold; font-size: 17px; text-align: center; }}
-</style>
-</head>
-<body>
-<table>
-  <tr>
-    <td colspan="2" style="text-align:center; vertical-align:middle; border:1px solid #000;">
-      {logo_html}
-    </td>
-    <td colspan="2" class="title">{DEPARTMENT_NAME} Service Desk Incident Notification</td>
-  </tr>
-  <tr>
-    <td class="q">Service/Application(s) Impacted</td>
-    <td class="a">{services}</td>
-    <td class="q">Service Status</td>
-    <td class="a" style="{status_style};font-weight:bold;text-align:center;">{status}</td>
-  </tr>
-  <tr>
-    <td class="q" rowspan="2">Users Impacted</td>
-    <td class="a" rowspan="2">{users}</td>
-    <td class="q">Time Started [LT]</td>
-    <td class="a">{start_time}</td>
-  </tr>
-  <tr>
-    <td class="q">Time Ended [LT]</td>
-    <td class="a">{end_time}</td>
-  </tr>
-  <tr>
-    <td class="q">Incident #</td>
-    <td class="a">{incidents_str}</td>
-    <td class="q">Next Update At [LT]</td>
-    <td class="a">{next_update}</td>
-  </tr>
-  <tr>
-    <td class="q">Description</td>
-    <td colspan="3" class="a">{description}</td>
-  </tr>
-  <tr>
-    <td class="q">Impact</td>
-    <td colspan="3" class="a">{impact}</td>
-  </tr>
-  {progress_rows}
-  <tr>
-    <td colspan="4" style="background:#00915A;color:white;font-weight:bold;
-        text-align:center;border:1px solid #000;padding:0px;height:28px;">
-      For any further queries, please contact: {DEPARTMENT_NAME} Service Desk - <u>{DEPARTMENT_DESK}</u>
-    </td>
-  </tr>
-</table>
-</body>
-</html>
-"""
-    return html
