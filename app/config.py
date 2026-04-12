@@ -4,12 +4,12 @@ Configuration - static constants for the application.
 
 DEPARTMENT_NAME = "FOREX"
 
-TO_RECIPIENT = "zeeshan@gmail.com"
+DEPARTMENT_DESK = "forex.user.dl@gmail.com"
 
 EMAIL_LISTS = {
-    "LEADS": [
-        "lead1@company.com",
-        "lead2@company.com"
+    "DEPT_TEAMS": [
+        "team1@company.com",
+        "team2@company.com"
     ],
     "APAC": [
         "chen.yun@gmail.com",
@@ -34,7 +34,7 @@ EMAIL_LISTS = {
     ],
 }
 
-SERVICES = ["BD", "DL", "MR V", "MR L", "RN", "RN SN", "DXT", "SRM", "CRZ", "RXT"]
+SERVICES = ["BlueRice", "Data Loading", "Makeit Rusk Val", "Makeit Rusk Lunits", "Rusk N", "RN SN", "DXT", "SRM", "CRZ", "RXT"]
 
 USERS = ["GLOBAL", "APAC", "EMEA", "AMERICAS"]
 

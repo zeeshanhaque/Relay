@@ -225,7 +225,7 @@ All data saved to `data/incidents_data.json` automatically.
 | Service list | `app/config.py` → `SERVICES` |
 | User regions | `app/config.py` → `USERS` |
 | Email lists | `app/config.py` → `EMAIL_LISTS` |
-| To recipient | `app/config.py` → `TO_RECIPIENT` |
+| To recipient | `app/config.py` → `DEPARTMENT_DESK` |
 | Department name | `app/config.py` → `DEPARTMENT_NAME` |
 | Colour scheme | `app/styles.py` → `MAIN_STYLE` |
 | Company logo | `resources/assets/` → update path in `output_panel.py` |

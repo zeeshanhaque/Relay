@@ -7,7 +7,7 @@ import json
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from .config import TO_RECIPIENT, EMAIL_LISTS, SERVICES, USERS, SERVICE_STATUSES
+from .config import DEPARTMENT_DESK, EMAIL_LISTS, SERVICES, USERS, SERVICE_STATUSES
 
 
 def _get_data_dir() -> Path:
@@ -70,7 +70,7 @@ def clear_data() -> dict:
 
 def get_recipients(selected_users: list[str]) -> list[str]:
     """Return deduplicated flat list of email recipients based on selected user regions.
-    LEADS are always included regardless of selected regions."""
+    DEPT_TEAMS are always included regardless of selected regions."""
     all_recipients = []
     
     if "GLOBAL" in selected_users:
@@ -80,8 +80,8 @@ def get_recipients(selected_users: list[str]) -> list[str]:
         for region in selected_users:
             all_recipients.extend(EMAIL_LISTS.get(region, []))
     
-    # Always add LEADS
-    all_recipients.extend(EMAIL_LISTS.get("LEADS", []))
+    # Always add DEPT_TEAMS
+    all_recipients.extend(EMAIL_LISTS.get("DEPT_TEAMS", []))
     
     # Deduplicate preserving order
     seen = set()
@@ -101,6 +101,29 @@ def format_list(items: list[str]) -> str:
     if len(items) == 2:
         return f"{items[0]} and {items[1]}"
     return ", ".join(items[:-1]) + f", and {items[-1]}"
+
+
+def format_services(services: list[str]) -> str:
+    """Format services list with DL always last if present."""
+    if "DL" in services:
+        others = [s for s in services if s != "DL"]
+        ordered = others + ["DL"]
+    else:
+        ordered = services
+    return format_list(ordered)
+
+
+def get_cob_date() -> str:
+    """Returns the COB date in DD/MM format.
+    COB is previous business day — yesterday unless today is Monday,
+    in which case it is the previous Friday."""
+    from datetime import date, timedelta
+    today = date.today()
+    if today.weekday() == 0:  # Monday
+        cob = today - timedelta(days=3)  # Friday
+    else:
+        cob = today - timedelta(days=1)
+    return cob.strftime("%d/%m")
 
 
 def round_to_quarter(dt: datetime) -> datetime:

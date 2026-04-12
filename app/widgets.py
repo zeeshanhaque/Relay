@@ -354,6 +354,7 @@ class MultiCheckDropdown(QWidget):
 class IncidentTag(QFrame):
     """A chip/tag showing a single incident with remove button."""
     removeRequested = Signal(int)
+    editRequested = Signal(int)
 
     def __init__(self, index: int, number: str, priority: str = "", parent=None):
         super().__init__(parent)
@@ -371,7 +372,7 @@ class IncidentTag(QFrame):
         layout.setSpacing(6)
 
         text = number
-        if priority:
+        if priority and priority != "P4":
             text += f" [{priority}]"
 
         lbl = QLabel(text)
@@ -385,6 +386,10 @@ class IncidentTag(QFrame):
         remove_btn.setFixedSize(20, 20)
         remove_btn.clicked.connect(lambda: self.removeRequested.emit(self._index))
         layout.addWidget(remove_btn)
+
+    def mouseDoubleClickEvent(self, event):
+        self.editRequested.emit(self._index)
+        super().mouseDoubleClickEvent(event)
 
     def set_index(self, index: int):
         self._index = index

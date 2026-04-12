@@ -1,37 +1,21 @@
 """
-Output Panel - displays generated email notification with copy button
-and the Outlook integration button.
+Output Panel - displays generated email notification and the Outlook integration button.
 """
 
 import sys
-import os
+import os, base64
 from pathlib import Path
+
 from PySide6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QLabel,
-    QPushButton,
-    QFrame,
-    QScrollArea,
-    QTableWidget,
-    QTableWidgetItem,
-    QHeaderView,
-    QSizePolicy,
-    QMessageBox,
-    QApplication,
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame,QScrollArea, QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox, QApplication
 )
 from PySide6.QtCore import QSize, QTimer, Qt, QMimeData
 from PySide6.QtGui import QFont, QColor, QIcon, QPixmap
 
 from .widgets import SectionTitle, SectionCard, CopyField
-from .config import TO_RECIPIENT, DEPARTMENT_NAME
+from .config import DEPARTMENT_DESK, DEPARTMENT_NAME
 from .data_manager import (
-    get_recipients,
-    format_list,
-    format_datetime_display,
-    load_data,
-    sort_progress_entries,
+    get_recipients, format_list, format_services, format_datetime_display, load_data, sort_progress_entries, get_cob_date
 )
 
 
@@ -46,12 +30,11 @@ def _get_logo_path() -> str:
 
 
 class OutputPanel(QWidget):
-    """Right panel: generated email preview."""
-
     def __init__(self, parent=None):
         super().__init__(parent)
         self._current_payload: dict | None = None
         self._build_ui()
+
 
     def _build_ui(self):
         outer = QVBoxLayout(self)
@@ -120,19 +103,24 @@ class OutputPanel(QWidget):
         self._copy_table_btn.hide()
         self._outlook_btn.hide()
 
-    # ── Public API ────────────────────────────────────────────────────────────
 
+    # ── Public API ────────────────────────────────────────────────────────────
     def populate(self, payload: dict):
         """Populate all output fields from the generate payload."""
         self._current_payload = payload
         data = load_data()
 
-        services = payload["services"]
+        services_raw = payload["services"]
+        services_str = format_services(services_raw)
         users = payload["users"]
         status = payload["status"]
         incidents = payload["incidents"]
 
-        services_str = format_list(services)
+        if "DL" in services_raw:
+            subject = f"[{status}] {DEPARTMENT_NAME} Incident Management Notification : {services_str} for COB {get_cob_date()}"
+        else:
+            subject = f"[{status}] {DEPARTMENT_NAME} Incident Management Notification : {services_str}"
+
         all_regions = {"APAC", "EMEA", "AMERICAS"}
         if set(users) >= all_regions:
             users_str = "GLOBAL"
@@ -143,16 +131,18 @@ class OutputPanel(QWidget):
         inc_parts = []
         for inc in incidents:
             p = inc.get("priority", "")
-            inc_parts.append(f"{inc['number']} [{p}]" if p else inc["number"])
+            if p and p != "P4":
+                inc_parts.append(f"{inc['number']} [{p}]")
+            else:
+                inc_parts.append(inc["number"])
         incidents_str = ", ".join(inc_parts)
 
         # Recipients
-        to_addr = TO_RECIPIENT
+        dept_desk = DEPARTMENT_DESK
         bcc_emails = get_recipients(users)
         bcc_str = "; ".join(bcc_emails)
-        subject = f"[{status}] {DEPARTMENT_NAME} Incident Management Notification : {services_str}"
 
-        self.to_field.set_text(to_addr)
+        self.to_field.set_text(dept_desk)
         self.bcc_field.set_text(bcc_str)
         self.subject_field.set_text(subject)
 
@@ -180,6 +170,7 @@ class OutputPanel(QWidget):
         self._copy_table_btn.show()
         self._outlook_btn.show()
 
+
     def clear(self):
         self.to_field.set_text("")
         self.bcc_field.set_text("")
@@ -190,8 +181,8 @@ class OutputPanel(QWidget):
         self._outlook_btn.hide()
         self._current_payload = None
 
-    # ── Outlook integration ───────────────────────────────────────────────────
 
+    # ── Outlook integration ───────────────────────────────────────────────────
     def _open_outlook(self):
         if not self._current_payload:
             return
@@ -211,15 +202,24 @@ class OutputPanel(QWidget):
         # Build email content first
         data = load_data()
         payload = self._current_payload
-        services = format_list(payload["services"])
+        services_raw = payload["services"]
+        services_str = format_services(services_raw)
         users = payload["users"]
         status = payload["status"]
         incidents = payload["incidents"]
 
+        if "DL" in services_raw:
+            subject = f"[{status}] {DEPARTMENT_NAME} Incident Management Notification : {services_str} for COB {get_cob_date()}"
+        else:
+            subject = f"[{status}] {DEPARTMENT_NAME} Incident Management Notification : {services_str}"
+
         inc_parts = []
         for inc in incidents:
             p = inc.get("priority", "")
-            inc_parts.append(f"{inc['number']} [{p}]" if p else inc["number"])
+            if p and p != "P4":
+                inc_parts.append(f"{inc['number']} [{p}]")
+            else:
+                inc_parts.append(inc["number"])
         incidents_str = ", ".join(inc_parts)
 
         all_regions = {"APAC", "EMEA", "AMERICAS"}
@@ -229,15 +229,14 @@ class OutputPanel(QWidget):
         end_str = format_datetime_display(payload.get("end_time", ""))
         next_str = format_datetime_display(payload.get("next_update", ""))
 
-        to_addr = TO_RECIPIENT
+        dept_desk = DEPARTMENT_DESK
         bcc_emails = get_recipients(users)
         bcc_str = "; ".join(bcc_emails)
-        subject = f"[{status}] {DEPARTMENT_NAME} Incident Management Notification : {services}"
 
         progress_entries = sort_progress_entries(data.get("progress_entries", []))
 
         html_body = build_email_html(
-            services=services,
+            services=services_str,
             users=users_str,
             status=status,
             incidents_str=incidents_str,
@@ -253,7 +252,7 @@ class OutputPanel(QWidget):
         outlook = _get_outlook_instance(win32com)
         if outlook is None:
             # All COM strategies failed — fall back to mailto: URI
-            _open_mailto_fallback(to_addr, subject, self)
+            _open_mailto_fallback(dept_desk, subject, self)
             return
 
         try:
@@ -261,8 +260,8 @@ class OutputPanel(QWidget):
 
             # ── To ────────────────────────────────────────────────────────────
             # Use Recipients.Add with Type=1 (olTo) for reliable delivery
-            if to_addr:
-                recip = mail.Recipients.Add(to_addr)
+            if dept_desk:
+                recip = mail.Recipients.Add(dept_desk)
                 recip.Type = 1  # olTo = 1
 
             # ── BCC ───────────────────────────────────────────────────────────
@@ -298,15 +297,16 @@ class OutputPanel(QWidget):
                 f"Outlook opened but failed to create the email draft:\n{e}",
             )
 
-    # ── Copy table as HTML ────────────────────────────────────────────────────
 
+    # ── Copy table as HTML ────────────────────────────────────────────────────
     def _copy_table_html(self):
         if not self._current_payload:
             return
 
         data = load_data()
         payload = self._current_payload
-        services = format_list(payload["services"])
+        services_raw = payload["services"]
+        services = format_services(services_raw)
         users = payload["users"]
         status = payload["status"]
         incidents = payload["incidents"]
@@ -314,7 +314,10 @@ class OutputPanel(QWidget):
         inc_parts = []
         for inc in incidents:
             p = inc.get("priority", "")
-            inc_parts.append(f"{inc['number']} [{p}]" if p else inc["number"])
+            if p and p != "P4":
+                inc_parts.append(f"{inc['number']} [{p}]")
+            else:
+                inc_parts.append(inc["number"])
         incidents_str = ", ".join(inc_parts)
 
         all_regions = {"APAC", "EMEA", "AMERICAS"}
@@ -349,8 +352,6 @@ class OutputPanel(QWidget):
 
 
 # ── Outlook helpers ───────────────────────────────────────────────────────────
-
-
 def _get_outlook_instance(win32com):
     """
     Try every known strategy to get an Outlook COM Application object.
@@ -397,13 +398,13 @@ def _get_outlook_instance(win32com):
     return None
 
 
-def _open_mailto_fallback(to_addr: str, subject: str, parent):
+def _open_mailto_fallback(dept_desk: str, subject: str, parent):
     """
     When COM is completely unavailable, open a plain mailto: link so the
     user's default mail client opens with at least the To and Subject pre-filled.
     Also show a helpful diagnostic message.
     """
-    import urllib.parse, subprocess, sys
+    import urllib.parse, subprocess
 
     QMessageBox.warning(
         parent,
@@ -424,12 +425,10 @@ def _open_mailto_fallback(to_addr: str, subject: str, parent):
     )
 
     params = urllib.parse.urlencode({"subject": subject}, quote_via=urllib.parse.quote)
-    mailto = f"mailto:{urllib.parse.quote(to_addr)}?{params}"
+    mailto = f"mailto:{urllib.parse.quote(dept_desk)}?{params}"
 
     try:
         if sys.platform == "win32":
-            import os
-
             os.startfile(mailto)
         else:
             subprocess.Popen(["xdg-open", mailto])
@@ -438,11 +437,8 @@ def _open_mailto_fallback(to_addr: str, subject: str, parent):
 
 
 # ── Notification table widget ─────────────────────────────────────────────────
-
-
 class NotificationTable(QWidget):
     """Renders the incident notification in a structured QTableWidget."""
-
     STATUS_COLORS = {
         "Available": ("#6fc040", "#ffffff"),
         "Unavailable": ("#e74c3c", "#ffffff"),
@@ -478,7 +474,6 @@ class NotificationTable(QWidget):
         impact,
         progress_entries: list[dict],
     ):
-
         rows_data = []
 
         # Title row
@@ -681,7 +676,7 @@ class NotificationTable(QWidget):
 
             elif kind == "footer":
                 footer_item = QTableWidgetItem(
-                    f'For any further queries, please contact: {DEPARTMENT_NAME} Service Desk - {TO_RECIPIENT}'
+                    f'For any further queries, please contact: {DEPARTMENT_NAME} Service Desk - {DEPARTMENT_DESK}'
                 )
                 footer_item.setTextAlignment(Qt.AlignCenter)
                 footer_item.setBackground(QColor("#00915A"))
@@ -699,14 +694,12 @@ class NotificationTable(QWidget):
 
     def _bold_font(self, size: int = 10) -> QFont:
         f = QFont()
-        f.setBold(True)
         f.setPointSize(size)
+        f.setBold(True)
         return f
 
 
 # ── HTML email builder ─────────────────────────────────────────────────────────
-
-
 def build_email_html(
     services,
     users,
@@ -719,8 +712,6 @@ def build_email_html(
     impact,
     progress_entries: list[dict],
 ) -> str:
-
-    import base64, os
 
     logo_b64 = ""
     logo_path = _get_logo_path()
@@ -817,7 +808,7 @@ def build_email_html(
   <tr>
     <td colspan="4" style="background:#00915A;color:white;font-weight:bold;
         text-align:center;border:1px solid #000;padding:0px;height:28px;">
-      For any further queries, please contact: {DEPARTMENT_NAME} Service Desk - <u>{TO_RECIPIENT}</u>
+      For any further queries, please contact: {DEPARTMENT_NAME} Service Desk - <u>{DEPARTMENT_DESK}</u>
     </td>
   </tr>
 </table>

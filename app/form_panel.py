@@ -222,11 +222,9 @@ class FormPanel(QWidget):
         grp.setSpacing(4)
         grp.addWidget(FieldLabel("Incident #", required=True))
 
-        # Outer row: input container + Add button
         row = QHBoxLayout()
         row.setSpacing(8)
 
-        # Container that mimics an input box with checkboxes inside
         container = QFrame()
         container.setStyleSheet("""
             QFrame {
@@ -259,19 +257,34 @@ class FormPanel(QWidget):
         """)
         container_layout.addWidget(self.inc_input)
 
-        # Divider
         div = QFrame()
         div.setFrameShape(QFrame.VLine)
         div.setStyleSheet("color: #e0e0e0; background: #e0e0e0;")
         div.setFixedWidth(1)
         container_layout.addWidget(div)
 
-        self.p1_check = QCheckBox("P1")
-        self.p2_check = QCheckBox("P2")
-        self.p1_check.setStyleSheet("QCheckBox { border: none; background: transparent; padding: 0px; }")
-        self.p2_check.setStyleSheet("QCheckBox { border: none; background: transparent; padding: 0px; }")
-        container_layout.addWidget(self.p1_check)
-        container_layout.addWidget(self.p2_check)
+        self.priority_combo = NoScrollComboBox()
+        self.priority_combo.addItems(["P4", "P3", "P2", "P1"])
+        self.priority_combo.setCurrentText("P4")
+        self.priority_combo.setStyleSheet("""
+            QComboBox {
+                border: none;
+                background: transparent;
+                padding: 0px 8px;
+                font-weight: 600;
+                color: #2c3e50;
+                min-width: 20px;
+            }
+            QComboBox::drop-down { border: none; width: 0px; }
+            QComboBox QAbstractItemView {
+                background: white;
+                border: 2px solid #00915A;
+                border-radius: 6px;
+                selection-background-color: #e8f5f0;
+                selection-color: #00915A;
+            }
+        """)
+        container_layout.addWidget(self.priority_combo)
 
         row.addWidget(container)
 
@@ -283,7 +296,7 @@ class FormPanel(QWidget):
 
         grp.addLayout(row)
 
-        self.inc_error = QLabel("⚠ Format must be INC + 7 or 8 digits (e.g. INC12345678)")
+        self.inc_error = QLabel("⚠ Format must be INC + 7 or 8 digits (e.g. INC0000001)")
         self.inc_error.setStyleSheet("color: #e74c3c; font-size: 11px;")
         self.inc_error.hide()
         grp.addWidget(self.inc_error)
@@ -298,9 +311,6 @@ class FormPanel(QWidget):
         self.add_inc_btn.clicked.connect(self._add_incident)
         self.inc_input.returnPressed.connect(self._add_incident)
         self.gen_btn.clicked.connect(self._on_generate)
-
-        self.p1_check.stateChanged.connect(self._on_p1_changed)
-        self.p2_check.stateChanged.connect(self._on_p2_changed)
 
         self.users_dropdown.selectionChanged.connect(self._on_users_changed)
 
@@ -375,21 +385,6 @@ class FormPanel(QWidget):
         else:
             self.users_dropdown.set_disabled_options([])
 
-    # ── Priority checkboxes ───────────────────────────────────────────────────
-
-    def _on_p1_changed(self, state):
-        if state:
-            self.p2_check.setChecked(False)
-            self.p2_check.setEnabled(False)
-        else:
-            self.p2_check.setEnabled(True)
-
-    def _on_p2_changed(self, state):
-        if state:
-            self.p1_check.setChecked(False)
-            self.p1_check.setEnabled(False)
-        else:
-            self.p1_check.setEnabled(True)
 
     # ── Incident management ───────────────────────────────────────────────────
 
@@ -409,14 +404,11 @@ class FormPanel(QWidget):
             QMessageBox.warning(self, "Duplicate", "This incident has already been added.")
             return
 
-        priority = "P1" if self.p1_check.isChecked() else ("P2" if self.p2_check.isChecked() else "")
+        priority = self.priority_combo.currentText()
         self._incidents.append({"number": num, "priority": priority})
 
         self.inc_input.clear()
-        self.p1_check.setChecked(False)
-        self.p2_check.setChecked(False)
-        self.p1_check.setEnabled(True)
-        self.p2_check.setEnabled(True)
+        self.priority_combo.setCurrentText("P4")  # reset to default
 
         self._render_incidents()
         self._auto_save()
@@ -437,7 +429,23 @@ class FormPanel(QWidget):
         for i, inc in enumerate(self._incidents):
             tag = IncidentTag(i, inc["number"], inc.get("priority", ""))
             tag.removeRequested.connect(self._remove_incident)
+            tag.editRequested.connect(self._edit_incident)
             self._incidents_layout.addWidget(tag)
+
+
+    def _edit_incident(self, index: int):
+        if 0 <= index < len(self._incidents):
+            inc = self._incidents[index]
+            # Populate input fields
+            self.inc_input.setText(inc["number"])
+            self.priority_combo.setCurrentText(inc.get("priority", "P4"))
+            # Remove from list
+            self._incidents.pop(index)
+            self._render_incidents()
+            self._auto_save()
+            # Focus the input
+            self.inc_input.setFocus()
+            self.inc_input.selectAll()
 
 
     # ── Text Inputs ─────────────────────────────────────────────────────────────
@@ -666,10 +674,6 @@ class FormPanel(QWidget):
         self.impact.clear()
         self.progress.clear()
         self.inc_input.clear()
-        self.p1_check.setChecked(False)
-        self.p2_check.setChecked(False)
-        self.p1_check.setEnabled(True)
-        self.p2_check.setEnabled(True)
         self.start_time.setDateTime(QDateTime.currentDateTime())
         self.end_time.setDateTime(QDateTime.currentDateTime())
         self.next_update.setDateTime(self.next_update.minimumDateTime())
