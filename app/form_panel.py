@@ -7,15 +7,13 @@ from datetime import datetime, timedelta
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QLineEdit, QTextEdit, QComboBox,
-    QCheckBox, QFrame, QScrollArea,
-    QMessageBox
+    QCheckBox, QFrame, QScrollArea, QMessageBox
 )
 from PySide6.QtCore import Qt, Signal, QDateTime, QSize
 from PySide6.QtGui import QPalette, QColor, QIcon
 
 from .widgets import (
-    SectionTitle, FieldLabel, MultiCheckDropdown,
-    IncidentTag, SectionCard, FiveMinDateTimeEdit
+    SectionTitle, FieldLabel, MultiCheckDropdown, IncidentTag, SectionCard, FiveMinDateTimeEdit
 )
 from .config import SERVICES, USERS, SERVICE_STATUSES
 from .data_manager import (
@@ -40,7 +38,6 @@ class FormPanel(QWidget):
         self._connect_signals()
 
     # ── Build UI ─────────────────────────────────────────────────────────────
-
     def _build_ui(self):
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -305,7 +302,6 @@ class FormPanel(QWidget):
 
 
     # ── Signals ──────────────────────────────────────────────────────────────
-
     def _connect_signals(self):
         self.status_combo.currentTextChanged.connect(self._on_status_changed)
         self.add_inc_btn.clicked.connect(self._add_incident)
@@ -325,7 +321,6 @@ class FormPanel(QWidget):
 
 
     # ── Status change handler ─────────────────────────────────────────────────
-
     def _on_status_changed(self, status: str):
         is_available = status == "Available"
 
@@ -376,7 +371,6 @@ class FormPanel(QWidget):
                 save_data(data)
 
     # ── User checkbox mutual exclusion ────────────────────────────────────────
-
     def _on_users_changed(self, selected: list[str]):
         if "GLOBAL" in selected:
             self.users_dropdown.set_disabled_options(["APAC", "EMEA", "AMERICAS"])
@@ -387,7 +381,6 @@ class FormPanel(QWidget):
 
 
     # ── Incident management ───────────────────────────────────────────────────
-
     def _add_incident(self):
         num = self.inc_input.text().strip().upper()
         if not num:
@@ -455,7 +448,6 @@ class FormPanel(QWidget):
 
 
     # ── Generate ─────────────────────────────────────────────────────────────
-
     def _on_generate(self):
         services = self.svc_dropdown.get_selected()
         users = self.users_dropdown.get_selected()
@@ -568,7 +560,6 @@ class FormPanel(QWidget):
         self.generateRequested.emit(payload)
 
     # ── Persistence ───────────────────────────────────────────────────────────
-
     def _save_progress_entry(self, text: str, dt: datetime):
         data = load_data()
         data["progress_entries"].append({

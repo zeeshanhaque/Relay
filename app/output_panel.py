@@ -13,7 +13,8 @@ from PySide6.QtGui import QIcon
 from .widgets import SectionTitle, SectionCard, CopyField
 from .config import DEPARTMENT_DESK, DEPARTMENT_NAME
 from .data_manager import (
-    get_recipients, format_list, format_services, format_datetime_display, load_data, sort_progress_entries, get_cob_date
+    get_recipients, get_cc_recipients, format_list, format_services,
+    format_datetime_display, load_data, sort_progress_entries, get_cob_date
 )
 from .email_builder import NotificationTable, build_email_html
 
@@ -49,6 +50,9 @@ class OutputPanel(QWidget):
         # Email header fields
         self.to_field = CopyField("To", label_width=60, boxed=True)
         card_layout.addWidget(self.to_field)
+
+        self.cc_field = CopyField("Cc", label_width=60, boxed=True)   # ← add this
+        card_layout.addWidget(self.cc_field)
 
         self.bcc_field = CopyField("Bcc", label_width=60, boxed=True)
         card_layout.addWidget(self.bcc_field)
@@ -130,6 +134,7 @@ class OutputPanel(QWidget):
             "impact": payload.get("impact", ""),
             "progress_entries": sort_progress_entries(data.get("progress_entries", [])),
             "bcc_emails": get_recipients(payload["users"]),
+            "cc_emails": get_cc_recipients(),
         }
 
 
@@ -140,6 +145,7 @@ class OutputPanel(QWidget):
         d = self._build_email_data(payload, data)
 
         self.to_field.set_text(DEPARTMENT_DESK)
+        self.cc_field.set_text("; ".join(d["cc_emails"]))
         self.bcc_field.set_text("; ".join(d["bcc_emails"]))
         self.subject_field.set_text(d["subject"])
 
@@ -161,6 +167,7 @@ class OutputPanel(QWidget):
 
     def clear(self):
         self.to_field.set_text("")
+        self.cc_field.set_text("")
         self.bcc_field.set_text("")
         self.subject_field.set_text("")
         self._table_widget._table.clearContents()
@@ -200,6 +207,7 @@ class OutputPanel(QWidget):
             mail = outlook.CreateItem(0)
             if DEPARTMENT_DESK:
                 mail.To = DEPARTMENT_DESK
+            mail.CC = "; ".join(d["cc_emails"])
             mail.BCC = "; ".join(d["bcc_emails"])
             mail.Subject = d["subject"]
             mail.Body = ""

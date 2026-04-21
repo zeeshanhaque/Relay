@@ -68,22 +68,24 @@ def clear_data() -> dict:
     return data
 
 
+def get_cc_recipients() -> list[str]:
+    """Return LEADS emails for CC — always included regardless of region."""
+    return EMAIL_LISTS.get("LEADS", [])
+
+
 def get_recipients(selected_users: list[str]) -> list[str]:
-    """Return deduplicated flat list of email recipients based on selected user regions.
-    DEPT_TEAMS are always included regardless of selected regions."""
     all_recipients = []
-    
     if "GLOBAL" in selected_users:
         for region in ["APAC", "EMEA", "AMERICAS"]:
             all_recipients.extend(EMAIL_LISTS.get(region, []))
     else:
         for region in selected_users:
             all_recipients.extend(EMAIL_LISTS.get(region, []))
-    
-    # Always add DEPT_TEAMS
+
+    # Always add DEPT_TEAMS to BCC
     all_recipients.extend(EMAIL_LISTS.get("DEPT_TEAMS", []))
-    
-    # Deduplicate preserving order
+
+    # Deduplicate
     seen = set()
     result = []
     for email in all_recipients:

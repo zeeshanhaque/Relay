@@ -1,13 +1,10 @@
 """
 Main Window - orchestrates all panels.
 """
-import sys
-from pathlib import Path
 
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QLabel, QFrame, QSplitter, QStackedWidget,
-    QMessageBox, QApplication
+    QPushButton, QLabel, QFrame, QSplitter, QStackedWidget, QMessageBox
 )
 from PySide6.QtCore import Qt, QSize, QTimer
 from PySide6.QtGui import QIcon, QPixmap
@@ -17,15 +14,6 @@ from .form_panel import FormPanel
 from .output_panel import OutputPanel
 from .settings_page import SettingsPage
 from .data_manager import clear_data, load_data
-
-
-def _get_logo_path() -> str:
-    if getattr(sys, 'frozen', False):
-        base = Path(sys.executable).parent
-    else:
-        base = Path(__file__).parent.parent
-    return str(base / "resources" / "assets" / "BNPP_logo.jpg")
-
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -193,5 +181,5 @@ class MainWindow(QMainWindow):
         if reply == QMessageBox.Yes:
             clear_data()
             self._form_panel.clear_form()
-            self._output_panel.clear()          # ← clear output panel
-            self._settings_page._load()         # ← refresh JSON view
+            self._output_panel.clear()
+            self._settings_page._load()

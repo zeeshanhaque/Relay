@@ -7,6 +7,10 @@ DEPARTMENT_NAME = "FOREX"
 DEPARTMENT_DESK = "forex.user.dl@gmail.com"
 
 EMAIL_LISTS = {
+    "LEADS": [
+        "lead1@company.com",
+        "lead2@company.com",
+    ],
     "DEPT_TEAMS": [
         "team1@company.com",
         "team2@company.com"
